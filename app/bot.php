@@ -383,6 +383,12 @@ class Bot
             case preg_match('~^/backup$~', $this->input['callback'], $m):
                 $this->backup();
                 break;
+            case preg_match('~^/backups$~', $this->input['callback'], $m):
+                $this->backupsMenu();
+                break;
+            case preg_match('~^/backupGet (\d+)$~', $this->input['callback'], $m):
+                $this->backupGet((int) $m[1]);
+                break;
             case preg_match('~^/generateSecret$~', $this->input['callback'], $m):
                 $this->generateSecret();
                 break;
@@ -8789,6 +8795,10 @@ DNS-over-HTTPS with IP:
                 'text'          => $this->i18n('backup') . ': ' . ($backup ?: $this->i18n('off')),
                 'callback_data' => "/backup",
             ],
+            [
+                'text'          => 'backup history',
+                'callback_data' => "/backups",
+            ],
         ];
         $data[] = [
             [
@@ -9264,6 +9274,60 @@ DNS-over-HTTPS with IP:
             'callback'       => 'setBackup',
             'args'           => [],
         ];
+    }
+
+    public function backupsMenu()
+    {
+        try {
+            $backups = $this->backups()->list(10);
+        } catch (Throwable $e) {
+            $this->update($this->input['chat'], $this->input['message_id'], 'Backups error: ' . $e->getMessage(), [
+                [[
+                    'text'          => $this->i18n('back'),
+                    'callback_data' => "/menu config",
+                ]],
+            ]);
+            return;
+        }
+
+        $text[] = 'Settings -> Backup history';
+        if (!$backups) {
+            $text[] = '';
+            $text[] = 'No local backups yet.';
+        }
+
+        foreach ($backups as $backup) {
+            $data[] = [[
+                'text'          => "#{$backup['id']} {$backup['created_at']} {$backup['name']}",
+                'callback_data' => "/backupGet {$backup['id']}",
+            ]];
+        }
+
+        $data[] = [[
+            'text'          => $this->i18n('back'),
+            'callback_data' => "/menu config",
+        ]];
+
+        $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $text), $data);
+    }
+
+    public function backupGet(int $id)
+    {
+        try {
+            $payload = $this->backups()->payload($id);
+            if ($payload === null) {
+                $this->answer($this->input['callback_id'], 'backup not found');
+                return;
+            }
+
+            $this->sendFile(
+                $this->input['chat'],
+                new CURLStringFile($payload, "kittybot_backup_$id.json", 'application/json'),
+            );
+            $this->answer($this->input['callback_id'], 'sent');
+        } catch (Throwable $e) {
+            $this->answer($this->input['callback_id'], $e->getMessage());
+        }
     }
 
     public function autoCleanLogs()
