@@ -143,13 +143,44 @@ class Bot
     {
         session_id($this->input['from']);
         session_start();
-        if (!empty($_SESSION['reply'])) {
+        $replies = $this->sessionReplies();
+        if (!empty($replies)) {
             if (empty($this->input['reply'])) {
-                foreach ($_SESSION['reply'] as $k => $v) {
+                foreach ($replies as $k => $v) {
                     $this->delete($this->input['chat'], $k);
                 }
-                unset($_SESSION['reply']);
+                $this->clearSessionReplies();
             }
+        }
+    }
+
+    /** @return array<int|string,array<string,mixed>> */
+    private function sessionReplies(): array
+    {
+        return !empty($_SESSION['reply']) && is_array($_SESSION['reply']) ? $_SESSION['reply'] : [];
+    }
+
+    /** @return array<string,mixed>|null */
+    private function sessionReply(int|string|null $messageId): ?array
+    {
+        if ($messageId === null) {
+            return null;
+        }
+
+        $reply = $this->sessionReplies()[$messageId] ?? null;
+        return is_array($reply) ? $reply : null;
+    }
+
+    private function clearSessionReplies(): void
+    {
+        unset($_SESSION['reply']);
+    }
+
+    private function removeSessionReply(int|string $messageId): void
+    {
+        unset($_SESSION['reply'][$messageId]);
+        if (empty($_SESSION['reply'])) {
+            unset($_SESSION['reply']);
         }
     }
 
@@ -2421,14 +2452,15 @@ class Bot
 
     public function reply()
     {
-        if (!empty($_SESSION['reply'][$this->input['reply']])) {
+        $reply = $this->sessionReply($this->input['reply'] ?? null);
+        if ($reply !== null) {
             $this->delete($this->input['chat'], $this->input['reply']);
             $this->delete($this->input['chat'], $this->input['message_id']);
-            $callback = $_SESSION['reply'][$this->input['reply']]['callback'];
-            $this->input['message_id']  = $this->input['callback_id'] = $_SESSION['reply'][$this->input['reply']]['start_message'];
-            $this->{$callback}($this->input['message'], ...$_SESSION['reply'][$this->input['reply']]['args']);
-            $this->answer($_SESSION['reply'][$this->input['reply']]['start_message']);
-            unset($_SESSION['reply'][$this->input['reply']]);
+            $callback = $reply['callback'];
+            $this->input['message_id'] = $this->input['callback_id'] = $reply['start_message'];
+            $this->{$callback}($this->input['message'], ...$reply['args']);
+            $this->answer($reply['start_message']);
+            $this->removeSessionReply($this->input['reply']);
         }
     }
 
