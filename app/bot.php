@@ -9,6 +9,7 @@ use KittyBot\Services\ServiceCatalog;
 use KittyBot\Storage\BackupRepository;
 use KittyBot\Storage\ClientsRepository;
 use KittyBot\Storage\Database;
+use KittyBot\Storage\HwidRepository;
 use KittyBot\Storage\MigrationRunner;
 use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
@@ -33,6 +34,7 @@ class Bot
     private ?ClientsRepository $clientsRepository = null;
     private ?BackupRepository $backupRepository = null;
     private ?Database $database = null;
+    private ?HwidRepository $hwidRepository = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -1897,7 +1899,7 @@ class Bot
             'wg1' => $wg1,
             'ad'  => yaml_parse_file($this->adguard),
             'pac' => $this->getPacConf(),
-            'hwid' => file_exists($this->hwid) ? (json_decode(file_get_contents($this->hwid), true) ?: []) : [],
+            'hwid' => $this->getHwidStorage(),
             'ssl' => file_exists('/certs/cert_private') && preg_match('~BEGIN PRIVATE KEY~', file_get_contents('/certs/cert_private')) ? [
                 'private' => file_get_contents('/certs/cert_private'),
                 'public'  => file_get_contents('/certs/cert_public'),
@@ -2026,7 +2028,7 @@ class Bot
                 $out[] = 'update hwid devices';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
                 $data = is_array($json['hwid']) ? $json['hwid'] : [];
-                file_put_contents($this->hwid, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                $this->setHwidStorage($data);
             }
             // xray
             if (!empty($json['xray'])) {
@@ -5280,16 +5282,33 @@ DNS-over-HTTPS with IP:
 
     public function getHwidStorage()
     {
-        if (!file_exists($this->hwid)) {
-            return [];
+        $fallback = file_exists($this->hwid) ? (json_decode(file_get_contents($this->hwid), true) ?: []) : [];
+        try {
+            $storage = $this->hwidStorage();
+            $storage->seed($fallback);
+            return $storage->all();
+        } catch (Throwable) {
+            return is_array($fallback) ? $fallback : [];
         }
-        $data = json_decode(file_get_contents($this->hwid), true);
-        return is_array($data) ? $data : [];
     }
 
     public function setHwidStorage(array $storage)
     {
+        try {
+            $this->hwidStorage()->setAll($storage);
+        } catch (Throwable) {
+        }
+
         file_put_contents($this->hwid, json_encode($storage, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function hwidStorage(): HwidRepository
+    {
+        if ($this->hwidRepository) {
+            return $this->hwidRepository;
+        }
+
+        return $this->hwidRepository = new HwidRepository($this->database()->pdo());
     }
 
     public function getHwidDevicesByUser($uid)
