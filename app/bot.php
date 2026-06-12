@@ -5,6 +5,7 @@ require_once __DIR__ . '/src/Autoload.php';
 use KittyBot\Backups\BackupHistoryService;
 use KittyBot\Backups\BackupImportService;
 use KittyBot\Backups\BackupPayloadCodec;
+use KittyBot\Backups\BackupRestoreService;
 use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
@@ -37,6 +38,7 @@ class Bot
     private ?BackupPayloadCodec $backupCodec = null;
     private ?BackupHistoryService $backupHistory = null;
     private ?BackupImportService $backupImport = null;
+    private ?BackupRestoreService $backupRestore = null;
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
     private ?ClientsRepository $clientsRepository = null;
@@ -1830,6 +1832,15 @@ class Bot
         return $this->backupImport = new BackupImportService($this->backupCodec());
     }
 
+    private function backupRestore(): BackupRestoreService
+    {
+        if ($this->backupRestore) {
+            return $this->backupRestore;
+        }
+
+        return $this->backupRestore = new BackupRestoreService();
+    }
+
     private function backupCodec(): BackupPayloadCodec
     {
         if ($this->backupCodec) {
@@ -2076,8 +2087,7 @@ class Bot
             if (!empty($json['ssl'])) {
                 $out[] = 'update certificates';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                file_put_contents('/certs/cert_private', $json['ssl']['private']);
-                file_put_contents('/certs/cert_public', $json['ssl']['public']);
+                $this->backupRestore()->applySsl($json['ssl']);
             }
             // pac
             if (!empty($json['pac'])) {
@@ -2149,7 +2159,7 @@ class Bot
             if (array_key_exists('hwid', $json)) {
                 $out[] = 'update hwid devices';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $data = is_array($json['hwid']) ? $json['hwid'] : [];
+                $data = $this->backupRestore()->normalizeHwid($json['hwid']);
                 $this->setHwidStorage($data);
             }
             // xray
@@ -2188,27 +2198,15 @@ class Bot
             if (!empty($json['dnstt'])) {
                 $out[] = 'update dnstt certificates';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                file_put_contents('/config/dnstt/server.key', $json['dnstt']['private']);
-                file_put_contents('/config/dnstt/server.pub', $json['dnstt']['public']);
+                $this->backupRestore()->applyDnstt($json['dnstt']);
             }
             // service states
             if (!empty($json['service_states']) && is_array($json['service_states'])) {
                 $out[] = 'update service states';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                foreach ($json['service_states'] as $service => $enabled) {
-                    if (!ServiceCatalog::isOptional($service)) {
-                        continue;
-                    }
-                    try {
-                        if ($enabled) {
-                            $this->containers()->enable($service);
-                        } else {
-                            $this->containers()->disable($service);
-                        }
-                    } catch (Throwable $e) {
-                        $out[] = "service $service: " . $e->getMessage();
-                        $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                    }
+                foreach ($this->backupRestore()->applyServiceStates($json['service_states'], $this->containers()) as $error) {
+                    $out[] = $error;
+                    $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
                 }
             }
             // nginx
