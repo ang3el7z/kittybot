@@ -2110,18 +2110,28 @@ class Bot
                 $out[] = 'update wireguard';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
                 $this->wg = 0;
-                $this->saveClients($json['wg']['clients']);
-                $this->restartWG($this->createConfig($json['wg']['server']), $switch_amnezia);
-                $this->iptablesWG();
+                $this->backupRestore()->applyWireguardInstance(
+                    $json['wg'],
+                    $switch_amnezia ?? 0,
+                    fn(array $clients) => $this->saveClients($clients),
+                    fn(array $server) => $this->createConfig($server),
+                    fn(string $config, int $switch) => $this->restartWG($config, $switch),
+                    fn() => $this->iptablesWG(),
+                );
             }
             // wg1
             if (!empty($json['wg1'])) {
                 $out[] = 'update wireguard 1';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
                 $this->wg = 1;
-                $this->saveClients($json['wg1']['clients']);
-                $this->restartWG($this->createConfig($json['wg1']['server']), $switch_wg1amnezia);
-                $this->iptablesWG();
+                $this->backupRestore()->applyWireguardInstance(
+                    $json['wg1'],
+                    $switch_wg1amnezia ?? 0,
+                    fn(array $clients) => $this->saveClients($clients),
+                    fn(array $server) => $this->createConfig($server),
+                    fn(string $config, int $switch) => $this->restartWG($config, $switch),
+                    fn() => $this->iptablesWG(),
+                );
             }
             // ad
             if (!empty($json['ad'])) {

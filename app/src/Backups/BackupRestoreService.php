@@ -90,6 +90,14 @@ final class BackupRestoreService
         $restart();
     }
 
+    /** @param array{server:array<string,mixed>,clients:array<int,mixed>} $wg */
+    public function applyWireguardInstance(array $wg, int $switchAmnezia, callable $saveClients, callable $createConfig, callable $restart, callable $iptables): void
+    {
+        $saveClients($wg['clients']);
+        $restart($createConfig($wg['server']), $switchAmnezia);
+        $iptables();
+    }
+
     /** @return array<string,mixed> */
     public function normalizeHwid(mixed $hwid): array
     {
