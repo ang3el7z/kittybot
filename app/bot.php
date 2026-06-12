@@ -20,6 +20,7 @@ use KittyBot\Storage\MigrationRunner;
 use KittyBot\Storage\SessionState;
 use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
+use KittyBot\WireGuard\WireGuardClientStore;
 
 class Bot
 {
@@ -43,7 +44,7 @@ class Bot
     private ?BackupRestoreService $backupRestore = null;
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
-    private ?ClientsRepository $clientsRepository = null;
+    private ?WireGuardClientStore $wireGuardClients = null;
     private ?Database $database = null;
     private ?HwidRepository $hwidRepository = null;
     private ?AdminRepository $adminRepository = null;
@@ -2009,17 +2010,7 @@ class Bot
 
     public function readClients(): array
     {
-        $file = $this->getInstanceWG(1) ? $this->clients1 : $this->clients;
-        $fallback = file_exists($file) ? (json_decode(file_get_contents($file), true) ?: []) : [];
-
-        try {
-            $scope = $this->clientScope();
-            $clients = $this->clientsStorage();
-            $clients->seed($scope, $fallback);
-            return $clients->all($scope);
-        } catch (Throwable) {
-            return $fallback;
-        }
+        return $this->wireGuardClients()->read($this->clientScope());
     }
 
     public function export()
@@ -9924,28 +9915,22 @@ DNS-over-HTTPS with IP:
     {
         $c      = $this->getPacConf();
         $domain = ($c['domain'] ?: $this->ip) . ":" . getenv($this->getInstanceWG(1) ? 'WG1PORT' : 'WGPORT');
-        foreach ($clients as $k => $v) {
-            $clients[$k]['peers'][0]['Endpoint'] = $domain;
-        }
-        $clients = array_values($clients);
-
-        try {
-            $this->clientsStorage()->setAll($this->clientScope(), $clients);
-        } catch (Throwable) {
-        }
-
-        file_put_contents($this->getInstanceWG(1) ? $this->clients1 : $this->clients, json_encode($clients, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->wireGuardClients()->save($this->clientScope(), $clients, $domain);
     }
 
-    private function clientsStorage(): ClientsRepository
+    private function wireGuardClients(): WireGuardClientStore
     {
-        if ($this->clientsRepository) {
-            return $this->clientsRepository;
+        if ($this->wireGuardClients) {
+            return $this->wireGuardClients;
         }
 
         $db = $this->database();
 
-        return $this->clientsRepository = new ClientsRepository($db->pdo());
+        return $this->wireGuardClients = new WireGuardClientStore(
+            new ClientsRepository($db->pdo()),
+            $this->clients,
+            $this->clients1
+        );
     }
 
     private function clientScope(): string
