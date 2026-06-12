@@ -6,6 +6,7 @@ use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
 use KittyBot\Services\ServiceCatalog;
+use KittyBot\Storage\AdminRepository;
 use KittyBot\Storage\BackupRepository;
 use KittyBot\Storage\ClientsRepository;
 use KittyBot\Storage\Database;
@@ -35,6 +36,7 @@ class Bot
     private ?BackupRepository $backupRepository = null;
     private ?Database $database = null;
     private ?HwidRepository $hwidRepository = null;
+    private ?AdminRepository $adminRepository = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -104,15 +106,27 @@ class Bot
         if (preg_match('~^/id$~', $this->input['message'])) {
             return;
         }
-        $file = __DIR__ . '/config.php';
-        require $file;
-        if (empty($c['admin'])) {
-            $c['admin'] = [$this->input['from']];
-            file_put_contents($file, "<?php\n\n\$c = " . var_export($c, true) . ";\n");
-        } elseif (!is_array($c['admin'])) {
-            $c['admin'] = [$c['admin']];
-            file_put_contents($file, "<?php\n\n\$c = " . var_export($c, true) . ";\n");
-        } elseif (!in_array($this->input['from'], $c['admin'])) {
+
+        $config = $this->loadConfig();
+        $seed = $config['admin'] ?? [];
+        $seed = is_array($seed) ? $seed : [$seed];
+        if (!$seed) {
+            $seed = [$this->input['from']];
+        }
+
+        try {
+            $this->adminsStorage()->seed($seed);
+            $admins = $this->admins();
+            if (!$admins) {
+                $this->adminsStorage()->add($this->input['from']);
+                $admins = $this->admins();
+            }
+            $this->syncAdminsToConfig($admins);
+        } catch (Throwable) {
+            $admins = array_map('strval', $seed);
+        }
+
+        if (!in_array((string) $this->input['from'], $admins, true)) {
             // $this->send($this->input['chat'], 'you are not authorized', $this->input['message_id']);
             exit;
         }
@@ -2638,6 +2652,55 @@ class Bot
         return $this->database;
     }
 
+    /** @return list<string> */
+    private function admins(): array
+    {
+        try {
+            $admins = $this->adminsStorage()->all();
+            if ($admins) {
+                return $admins;
+            }
+        } catch (Throwable) {
+        }
+
+        $config = $this->loadConfig();
+        $admins = $config['admin'] ?? [];
+        $admins = is_array($admins) ? $admins : [$admins];
+        return array_values(array_filter(array_map('strval', $admins), static fn(string $id): bool => $id !== ''));
+    }
+
+    private function adminsStorage(): AdminRepository
+    {
+        if ($this->adminRepository) {
+            return $this->adminRepository;
+        }
+
+        return $this->adminRepository = new AdminRepository($this->database()->pdo());
+    }
+
+    /** @return array<string,mixed> */
+    private function loadConfig(): array
+    {
+        $file = __DIR__ . '/config.php';
+        $c = [];
+        if (is_file($file)) {
+            opcache_invalidate($file);
+            require $file;
+        }
+
+        return is_array($c ?? null) ? $c : [];
+    }
+
+    /** @param list<string> $admins */
+    private function syncAdminsToConfig(array $admins): void
+    {
+        $file = __DIR__ . '/config.php';
+        $config = $this->loadConfig();
+        $config['admin'] = array_values(array_unique(array_filter($admins, static fn(string $id): bool => $id !== '')));
+        file_put_contents($file, "<?php\n\n\$c = " . var_export($config, true) . ";\n");
+        opcache_invalidate($file);
+    }
+
     public function domain()
     {
         $r = $this->send(
@@ -2861,19 +2924,21 @@ class Bot
 
     public function addAdmin($id)
     {
-        $file = __DIR__ . '/config.php';
-        require $file;
-        $c['admin'][] = $id;
-        file_put_contents($file, "<?php\n\n\$c = " . var_export($c, true) . ";\n");
+        $this->adminsStorage()->add($id);
+        $this->syncAdminsToConfig($this->admins());
         $this->menu('config');
     }
 
     public function delAdmin($id)
     {
-        $file = __DIR__ . '/config.php';
-        require $file;
-        unset($c['admin'][array_search($id, $c['admin'])]);
-        file_put_contents($file, "<?php\n\n\$c = " . var_export($c, true) . ";\n");
+        if (count($this->admins()) <= 1) {
+            $this->answer($this->input['callback_id'], 'cannot delete last admin');
+            $this->menu('config');
+            return;
+        }
+
+        $this->adminsStorage()->delete($id);
+        $this->syncAdminsToConfig($this->admins());
         $this->menu('config');
     }
 
@@ -8852,10 +8917,7 @@ DNS-over-HTTPS with IP:
                 'callback_data' => "/addadmin",
             ],
         ];
-        $file = __DIR__ . '/config.php';
-        opcache_invalidate($file);
-        require $file;
-        foreach ($c['admin'] as $k => $v) {
+        foreach ($this->admins() as $v) {
             $data[] = [
                 [
                     'text'          => $this->i18n('delete') . " $v",
