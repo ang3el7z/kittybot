@@ -181,12 +181,25 @@ class Bot
         unset($_SESSION['reply']);
     }
 
+    /** @param array<string,mixed> $reply */
+    private function rememberReply(int|string $messageId, array $reply): void
+    {
+        $_SESSION['reply'][$messageId] = $reply;
+    }
+
     private function removeSessionReply(int|string $messageId): void
     {
         unset($_SESSION['reply'][$messageId]);
         if (empty($_SESSION['reply'])) {
             unset($_SESSION['reply']);
         }
+    }
+
+    /** @return list<mixed> */
+    private function sessionReplyArgs(int|string|null $messageId): array
+    {
+        $reply = $this->sessionReply($messageId);
+        return !empty($reply['args']) && is_array($reply['args']) ? array_values($reply['args']) : [];
     }
 
     public function sd($var, $log = false, $json = false, $raw = false)
@@ -789,7 +802,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter key or 0 for stop mtproto',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'secretSet',
@@ -976,7 +989,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter url',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'urlcheck',
@@ -1015,7 +1028,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'sspwdch',
@@ -1039,7 +1052,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter camouflage key',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chockey',
@@ -1055,7 +1068,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter subdomain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chOcSubdomain',
@@ -1071,7 +1084,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chocdns',
@@ -1087,7 +1100,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chocpass',
@@ -1103,7 +1116,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter login',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chnplogin',
@@ -1119,7 +1132,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter subdomain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chNpSubdomain',
@@ -1135,7 +1148,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chnppass',
@@ -1151,7 +1164,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'chhypass',
@@ -1167,7 +1180,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter name',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'addocus',
@@ -1183,7 +1196,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter name:uuid [,name:uuid]',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'addxrus',
@@ -1199,7 +1212,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'renXrUs',
@@ -1215,7 +1228,7 @@ class Bot
             $this->input['message_id'],
             reply: 'attach html',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setOverrideHtml',
@@ -1417,7 +1430,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter the title:',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'renameClient',
@@ -1433,7 +1446,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter time like https://www.php.net/manual/ru/function.strtotime.php:',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'timerClient',
@@ -1449,7 +1462,7 @@ class Bot
             $this->input['message_id'],
             reply: 'send the export file:',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'importListFile',
@@ -1510,7 +1523,7 @@ class Bot
         }
         $this->saveClients($clients);
         $this->restartWG($this->createConfig($server));
-        $this->menu('client', implode('_', $_SESSION['reply'][$this->input['reply']]['args']));
+        $this->menu('client', implode('_', $this->sessionReplyArgs($this->input['reply'] ?? null)));
     }
 
     public function cron()
@@ -1918,7 +1931,7 @@ class Bot
             }
         }
         $this->restartWG($this->createConfig($server));
-        $this->menu('client', implode('_', $_SESSION['reply'][$this->input['reply']]['args']));
+        $this->menu('client', implode('_', $this->sessionReplyArgs($this->input['reply'] ?? null)));
     }
 
     public function readClients(): array
@@ -1986,7 +1999,7 @@ class Bot
             $this->input['message_id'],
             reply: 'send the export file:',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'importFile',
@@ -2641,7 +2654,7 @@ class Bot
             $this->input['message_id'],
             reply: 'list subnets separated by commas',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'createPeer',
             'args'          => ['subnet'],
@@ -2757,7 +2770,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter domain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'addDomain',
             'args'          => [],
@@ -2772,7 +2785,7 @@ class Bot
             $this->input['message_id'],
             reply: 'send file with your certificate chain and private key',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'selfsslInstall',
             'args'          => [],
@@ -2804,7 +2817,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'chpsswd',
             'args'          => [],
@@ -2819,7 +2832,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter key',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setAdKey',
             'args'          => [],
@@ -2834,7 +2847,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter time like https://www.php.net/manual/ru/function.strtotime.php:',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setTimerXr',
             'args'          => [$k],
@@ -2857,7 +2870,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter id',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'addAdmin',
             'args'          => [],
@@ -2872,7 +2885,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter subdomain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setSubdomain',
             'args'          => [],
@@ -2887,7 +2900,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter seconds:count_ip',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'switchIpLimit',
             'args'          => [],
@@ -2902,7 +2915,7 @@ class Bot
             $this->input['message_id'],
             reply: 'number port',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setPort',
             'args'          => [$container],
@@ -2917,7 +2930,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter domain for link',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setLinkDomain',
             'args'          => [],
@@ -2956,7 +2969,7 @@ class Bot
             $this->input['message_id'],
             reply: 'enter limit on page',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setPage',
             'args'          => [],
@@ -3094,7 +3107,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter command',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'dnscheck',
             'args'          => [],
@@ -3121,7 +3134,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter address upstream',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'upstream',
             'args'          => [],
@@ -3192,7 +3205,7 @@ DNS-over-HTTPS with IP:
                 );
                 break;
         }
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'addInclude',
             'args'          => [$type],
@@ -3395,7 +3408,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'list domains separated by commas',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'addReverse',
             'args'          => [$count],
@@ -3427,7 +3440,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'list subdomains separated by commas',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'addSubzones',
             'args'          => [$count],
@@ -3459,7 +3472,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter regular expression',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'addExclude',
             'args'          => [$count],
@@ -3723,7 +3736,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter dns separated by commas',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setDNS',
@@ -3739,7 +3752,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter MTU',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setMTU',
@@ -3755,7 +3768,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter MTU',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'changeClientMTU',
@@ -3807,7 +3820,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter subnet separated by commas',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'subnetSave',
@@ -3870,7 +3883,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter like \'10.0.0.0/24, -10.0.0.5/32\'',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'calcSubnet',
@@ -4034,7 +4047,7 @@ DNS-over-HTTPS with IP:
                     $this->input['message_id'],
                     reply: 'list subnets separated by commas',
                 );
-                $_SESSION['reply'][$r['result']['message_id']] = [
+                $this->rememberReply($r['result']['message_id'], [
                     'start_message' => $this->input['message_id'],
                     'callback'      => 'setIps',
                     'args'          => [$k, $page],
@@ -4891,7 +4904,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter domain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setdnsttDomain',
             'args'          => [],
@@ -4906,7 +4919,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter password',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'setdnsttPassword',
             'args'          => [],
@@ -5369,7 +5382,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter hwid devices count',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'saveHwidDevices',
             'args'          => [$context],
@@ -6632,7 +6645,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'send the template file:',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'addTemplate',
@@ -6648,7 +6661,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'send time like 1 hour or 1 day etc',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setAutoScanTimeout',
@@ -6680,7 +6693,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'send the template name',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'copyTemplate',
@@ -6866,7 +6879,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'send name',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setMainOutbound',
@@ -7133,7 +7146,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter key',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'addWarpPlus',
@@ -7661,7 +7674,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter hwid devices count',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message' => $this->input['message_id'],
             'callback'      => 'saveHwidUserLimit',
             'args'          => [$i],
@@ -9406,7 +9419,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter like: now / 12 hours',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setBackup',
@@ -9476,7 +9489,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter like: now / 12 hours',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setAutoCleanLogs',
@@ -9492,7 +9505,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter domain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setFakeDomain',
@@ -9508,7 +9521,7 @@ DNS-over-HTTPS with IP:
             $this->input['message_id'],
             reply: 'enter domain',
         );
-        $_SESSION['reply'][$r['result']['message_id']] = [
+        $this->rememberReply($r['result']['message_id'], [
             'start_message'  => $this->input['message_id'],
             'start_callback' => $this->input['callback_id'],
             'callback'       => 'setTelegramDomain',
