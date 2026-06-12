@@ -3,6 +3,7 @@
 require_once __DIR__ . '/src/Autoload.php';
 
 use KittyBot\Backups\BackupHistoryService;
+use KittyBot\Backups\BackupApplyService;
 use KittyBot\Backups\BackupImportService;
 use KittyBot\Backups\BackupPayloadCodec;
 use KittyBot\Backups\BackupRestoreService;
@@ -37,6 +38,7 @@ class Bot
     public $hwid;
     private ?BackupPayloadCodec $backupCodec = null;
     private ?BackupHistoryService $backupHistory = null;
+    private ?BackupApplyService $backupApply = null;
     private ?BackupImportService $backupImport = null;
     private ?BackupRestoreService $backupRestore = null;
     private ?ContainerService $containerService = null;
@@ -1832,6 +1834,15 @@ class Bot
         return $this->backupImport = new BackupImportService($this->backupCodec());
     }
 
+    private function backupApply(): BackupApplyService
+    {
+        if ($this->backupApply) {
+            return $this->backupApply;
+        }
+
+        return $this->backupApply = new BackupApplyService($this->backupRestore());
+    }
+
     private function backupRestore(): BackupRestoreService
     {
         if ($this->backupRestore) {
@@ -2083,166 +2094,39 @@ class Bot
         }
 
         if (!empty($json) && is_array($json)) {
-            // certs
-            if (!empty($json['ssl'])) {
-                $out[] = 'update certificates';
+            $out = [];
+            $progress = function (string $step) use (&$out): void {
+                $out[] = $step;
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applySsl($json['ssl']);
-            }
-            // pac
-            if (!empty($json['pac'])) {
-                $out[] = 'update pac';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $pacRestore = $this->backupRestore()->applyPac(
-                    $json['pac'],
-                    fn() => $this->getPacConf(),
-                    fn(array $pac) => $this->setPacConf($pac),
-                    fn() => $this->restartNaive(),
-                    fn(string $import = '') => $this->pacUpdate($import),
-                );
-                $switch_amnezia = $pacRestore['switch_amnezia'];
-                $switch_wg1amnezia = $pacRestore['switch_wg1amnezia'];
-                $out[] = 'update naiveproxy';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-            }
-            // wg
-            if (!empty($json['wg'])) {
-                $out[] = 'update wireguard';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->wg = 0;
-                $this->backupRestore()->applyWireguardInstance(
-                    $json['wg'],
-                    $switch_amnezia ?? 0,
-                    fn(array $clients) => $this->saveClients($clients),
-                    fn(array $server) => $this->createConfig($server),
-                    fn(string $config, int $switch) => $this->restartWG($config, $switch),
-                    fn() => $this->iptablesWG(),
-                );
-            }
-            // wg1
-            if (!empty($json['wg1'])) {
-                $out[] = 'update wireguard 1';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->wg = 1;
-                $this->backupRestore()->applyWireguardInstance(
-                    $json['wg1'],
-                    $switch_wg1amnezia ?? 0,
-                    fn(array $clients) => $this->saveClients($clients),
-                    fn(array $server) => $this->createConfig($server),
-                    fn(string $config, int $switch) => $this->restartWG($config, $switch),
-                    fn() => $this->iptablesWG(),
-                );
-            }
-            // ad
-            if (!empty($json['ad'])) {
-                $out[] = 'update adguard';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyAdguard(
-                    $json['ad'],
-                    $this->adguard,
-                    fn() => $this->stopAd(),
-                    fn() => $this->startAd(),
-                );
-            }
-            // ss
-            if (!empty($json['ss'])) {
-                $out[] = 'update shadowsocks server';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyShadowsocksServer(
-                    $json['ss'],
-                    fn(string $command, string $service) => $this->ssh($command, $service),
-                );
-            }
-            // sl
-            if (!empty($json['sl'])) {
-                $out[] = 'update shadowsocks proxy';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyShadowsocksProxy(
-                    $json['sl'],
-                    fn(string $command, string $service) => $this->ssh($command, $service),
-                );
-            }
-            // mtproto
-            if (!empty($json['mtproto'])) {
-                $out[] = 'update mtproto';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyMtproto(
-                    $json['mtproto'],
-                    $json['mtprotodomain'] ?? '',
-                    fn() => $this->restartTG(),
-                );
-            }
-            // hwid
-            if (array_key_exists('hwid', $json)) {
-                $out[] = 'update hwid devices';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $data = $this->backupRestore()->normalizeHwid($json['hwid']);
-                $this->setHwidStorage($data);
-            }
-            // xray
-            if (!empty($json['xray'])) {
-                $out[] = 'update xray';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyXray(
-                    $json['xray'],
-                    $json['pac'] ?? [],
-                    fn(array $xray) => $this->restartXray($xray),
-                    fn() => $this->adguardXrayClients(),
-                    fn(string $domain) => $this->setUpstreamDomain($domain),
-                );
-            }
-            // xraystats
-            if (!empty($json['xraystats'])) {
-                $out[] = 'update xray stats';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyXrayStats(
-                    $json['xraystats'],
-                    fn(array $stats) => $this->setXrayStats($stats),
-                );
-            }
-            // ocserv
-            if (!empty($json['oc'])) {
-                $out[] = 'update ocserv';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyOcserv(
-                    $json['oc'],
-                    $json['ocu'],
-                    fn(string $config) => $this->restartOcserv($config),
-                );
-            }
-            // hysteria
-            if (!empty($json['hy'])) {
-                $out[] = 'update hysteria';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyHysteria(
-                    $json['hy'],
-                    fn() => $this->restartHysteria(),
-                );
-            }
-            if (!empty($json['pac']['domain'])) {
-                $this->setUpstreamDomainOcserv($json['pac']['domain']);
-                $this->setUpstreamDomainNaive($json['pac']['domain']);
-            }
-            // dnstt
-            if (!empty($json['dnstt'])) {
-                $out[] = 'update dnstt certificates';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->backupRestore()->applyDnstt($json['dnstt']);
-            }
-            // service states
-            if (!empty($json['service_states']) && is_array($json['service_states'])) {
-                $out[] = 'update service states';
-                $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                foreach ($this->backupRestore()->applyServiceStates($json['service_states'], $this->containers()) as $error) {
-                    $out[] = $error;
-                    $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                }
-            }
-            // nginx
-            $out[] = 'reset nginx';
-            $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
+            };
 
-            $this->cloakNginx();
+            $this->backupApply()->apply($json, [
+                'getPacConf' => fn() => $this->getPacConf(),
+                'setPacConf' => fn(array $pac) => $this->setPacConf($pac),
+                'restartNaive' => fn() => $this->restartNaive(),
+                'pacUpdate' => fn(string $import = '') => $this->pacUpdate($import),
+                'setWgScope' => function (int $scope): void { $this->wg = $scope; },
+                'saveClients' => fn(array $clients) => $this->saveClients($clients),
+                'createConfig' => fn(array $server) => $this->createConfig($server),
+                'restartWG' => fn(string $config, int $switch) => $this->restartWG($config, $switch),
+                'iptablesWG' => fn() => $this->iptablesWG(),
+                'adguardPath' => fn() => $this->adguard,
+                'stopAd' => fn() => $this->stopAd(),
+                'startAd' => fn() => $this->startAd(),
+                'ssh' => fn(string $command, string $service) => $this->ssh($command, $service),
+                'restartTG' => fn() => $this->restartTG(),
+                'setHwidStorage' => fn(array $storage) => $this->setHwidStorage($storage),
+                'restartXray' => fn(array $xray) => $this->restartXray($xray),
+                'adguardXrayClients' => fn() => $this->adguardXrayClients(),
+                'setUpstreamDomain' => fn(string $domain) => $this->setUpstreamDomain($domain),
+                'setXrayStats' => fn(array $stats) => $this->setXrayStats($stats),
+                'restartOcserv' => fn(string $config) => $this->restartOcserv($config),
+                'restartHysteria' => fn() => $this->restartHysteria(),
+                'setUpstreamDomainOcserv' => fn(string $domain) => $this->setUpstreamDomainOcserv($domain),
+                'setUpstreamDomainNaive' => fn(string $domain) => $this->setUpstreamDomainNaive($domain),
+                'containers' => fn() => $this->containers(),
+                'cloakNginx' => fn() => $this->cloakNginx(),
+            ], $progress);
 
             $out[] = "end import";
             $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
