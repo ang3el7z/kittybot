@@ -202,6 +202,59 @@ class Bot
         return !empty($reply['args']) && is_array($reply['args']) ? array_values($reply['args']) : [];
     }
 
+    private function proxyListEntryEnabled(): bool
+    {
+        return !empty($_SESSION['proxylistentry']);
+    }
+
+    private function setProxyListEntryEnabled(bool $enabled): void
+    {
+        if ($enabled) {
+            $_SESSION['proxylistentry'] = 1;
+            return;
+        }
+
+        unset($_SESSION['proxylistentry']);
+    }
+
+    /** @return array<string,string> */
+    private function hwidTokenPool(string $scope): array
+    {
+        if (empty($_SESSION['hwidTokens']) || !is_array($_SESSION['hwidTokens'])) {
+            $_SESSION['hwidTokens'] = [];
+        }
+        if (empty($_SESSION['hwidTokens'][$scope]) || !is_array($_SESSION['hwidTokens'][$scope])) {
+            $_SESSION['hwidTokens'][$scope] = [];
+        }
+
+        return $_SESSION['hwidTokens'][$scope];
+    }
+
+    private function rememberHwidSessionToken(string $scope, string $token, string $hwid): void
+    {
+        $this->hwidTokenPool($scope);
+        $_SESSION['hwidTokens'][$scope][$token] = $hwid;
+    }
+
+    private function consumeHwidSessionToken(string $scope, string $token): ?string
+    {
+        $pool = $this->hwidTokenPool($scope);
+        if (!isset($pool[$token])) {
+            return null;
+        }
+
+        $hwid = $pool[$token];
+        unset($_SESSION['hwidTokens'][$scope][$token]);
+
+        return $hwid;
+    }
+
+    private function clearHwidSessionTokens(string $scope): void
+    {
+        $this->hwidTokenPool($scope);
+        $_SESSION['hwidTokens'][$scope] = [];
+    }
+
     public function sd($var, $log = false, $json = false, $raw = false)
     {
         if ($log) {
@@ -3241,8 +3294,8 @@ DNS-over-HTTPS with IP:
     {
         switch ($type) {
             case 'includelist':
-                $this->pacUpdate($_SESSION['proxylistentry']);
-                if (!empty($_SESSION['proxylistentry'])) {
+                $this->pacUpdate($this->proxyListEntryEnabled());
+                if ($this->proxyListEntryEnabled()) {
                     $this->xtlsproxy($page);
                 }
                 break;
@@ -4267,7 +4320,7 @@ DNS-over-HTTPS with IP:
 
     public function pacMenu($page = 0)
     {
-        unset($_SESSION['proxylistentry']);
+        $this->setProxyListEntryEnabled(false);
         $rmpac  = stat(__DIR__ . '/zapretlists/rmpac');
         $rpac   = stat(__DIR__ . '/zapretlists/rpac');
         $mpac   = stat(__DIR__ . '/zapretlists/mpac');
@@ -4551,7 +4604,7 @@ DNS-over-HTTPS with IP:
 
     public function xtlsproxy($page = 0)
     {
-        $_SESSION['proxylistentry'] = 1;
+        $this->setProxyListEntryEnabled(true);
         $p = $this->getPacConf();
         $text[] = "Menu -> " . $this->i18n('xray') . ' -> ' . $this->i18n('routes') . ' -> proxy list';
         [$data] = $this->listPac('includelist', $page, 'xtlsproxy');
@@ -5478,30 +5531,23 @@ DNS-over-HTTPS with IP:
 
     protected function rememberHwidToken($scope, $hwid)
     {
-        if (!isset($_SESSION['hwidTokens'])) {
-            $_SESSION['hwidTokens'] = [];
-        }
-        if (!isset($_SESSION['hwidTokens'][$scope])) {
-            $_SESSION['hwidTokens'][$scope] = [];
-        }
+        $pool = $this->hwidTokenPool($scope);
         do {
             try {
                 $token = bin2hex(random_bytes(5));
             } catch (\Throwable $e) {
                 $token = substr(hash('sha256', $hwid . microtime(true)), 0, 10);
             }
-        } while (isset($_SESSION['hwidTokens'][$scope][$token]));
+        } while (isset($pool[$token]));
 
-        $_SESSION['hwidTokens'][$scope][$token] = $hwid;
+        $this->rememberHwidSessionToken($scope, $token, $hwid);
 
         return $token;
     }
 
     protected function resolveHwidToken($scope, $token)
     {
-        if (isset($_SESSION['hwidTokens'][$scope][$token])) {
-            $hwid = $_SESSION['hwidTokens'][$scope][$token];
-            unset($_SESSION['hwidTokens'][$scope][$token]);
+        if ($hwid = $this->consumeHwidSessionToken($scope, $token)) {
             return $hwid;
         }
 
@@ -7533,10 +7579,7 @@ DNS-over-HTTPS with IP:
 
         $devices = $this->getHwidDevicesByUser($client['id']);
         $scope   = $this->getHwidTokenScope($i);
-        if (!isset($_SESSION['hwidTokens'])) {
-            $_SESSION['hwidTokens'] = [];
-        }
-        $_SESSION['hwidTokens'][$scope] = [];
+        $this->clearHwidSessionTokens($scope);
         uasort($devices, fn($a, $b) => ($b['time'] ?? 0) <=> ($a['time'] ?? 0));
         $hwids        = array_keys($devices);
         $perPage      = max(1, $this->limit ?: 5);
