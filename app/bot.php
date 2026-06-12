@@ -6,6 +6,7 @@ use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
 use KittyBot\Services\ServiceCatalog;
+use KittyBot\Storage\ClientsRepository;
 use KittyBot\Storage\Database;
 use KittyBot\Storage\MigrationRunner;
 use KittyBot\Storage\SettingsRepository;
@@ -28,6 +29,7 @@ class Bot
     public $hwid;
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
+    private ?ClientsRepository $clientsRepository = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -1836,7 +1838,17 @@ class Bot
 
     public function readClients(): array
     {
-        return json_decode(file_get_contents($this->getInstanceWG(1) ? $this->clients1 : $this->clients), true) ?: [];
+        $file = $this->getInstanceWG(1) ? $this->clients1 : $this->clients;
+        $fallback = file_exists($file) ? (json_decode(file_get_contents($file), true) ?: []) : [];
+
+        try {
+            $scope = $this->clientScope();
+            $clients = $this->clientsStorage();
+            $clients->seed($scope, $fallback);
+            return $clients->all($scope);
+        } catch (Throwable) {
+            return $fallback;
+        }
     }
 
     public function export()
@@ -1844,12 +1856,12 @@ class Bot
         $this->wg = 0;
         $wg = [
             'server'  => $this->readConfig(),
-            'clients' => json_decode(file_get_contents($this->clients), true) ?: [],
+            'clients' => $this->readClients(),
         ];
         $this->wg = 1;
         $wg1 = [
             'server'  => $this->readConfig(),
-            'clients' => json_decode(file_get_contents($this->clients1), true) ?: [],
+            'clients' => $this->readClients(),
         ];
         $conf = [
             'schema_version' => 2,
@@ -9711,7 +9723,31 @@ DNS-over-HTTPS with IP:
         foreach ($clients as $k => $v) {
             $clients[$k]['peers'][0]['Endpoint'] = $domain;
         }
+        $clients = array_values($clients);
+
+        try {
+            $this->clientsStorage()->setAll($this->clientScope(), $clients);
+        } catch (Throwable) {
+        }
+
         file_put_contents($this->getInstanceWG(1) ? $this->clients1 : $this->clients, json_encode($clients, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function clientsStorage(): ClientsRepository
+    {
+        if ($this->clientsRepository) {
+            return $this->clientsRepository;
+        }
+
+        $db = new Database();
+        (new MigrationRunner($db->pdo()))->migrate();
+
+        return $this->clientsRepository = new ClientsRepository($db->pdo());
+    }
+
+    private function clientScope(): string
+    {
+        return $this->getInstanceWG(1) ? 'wg1' : 'wg';
     }
 
     public function getWGType($revert = 0)
