@@ -6,6 +6,7 @@ use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
 use KittyBot\Services\ServiceCatalog;
+use KittyBot\Storage\BackupRepository;
 use KittyBot\Storage\ClientsRepository;
 use KittyBot\Storage\Database;
 use KittyBot\Storage\MigrationRunner;
@@ -30,6 +31,7 @@ class Bot
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
     private ?ClientsRepository $clientsRepository = null;
+    private ?BackupRepository $backupRepository = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -1679,15 +1681,33 @@ class Bot
         $conf = $this->getPacConf();
         $bot  = preg_replace('~[\W]~iu', '_', $this->request('getMyName', [])['result']['name']);
         $json = $this->export();
+        $name = "{$bot}_export_" . date('d_m_Y_H_i') . '.json';
+        try {
+            $this->backups()->add($name, $json);
+        } catch (Throwable $e) {
+            file_put_contents('/logs/php_error', "backup history: {$e->getMessage()}\n", FILE_APPEND);
+        }
         if (!empty($file)) {
             file_put_contents($file, $json);
         }
         if (!empty($conf['pinbackup'])) {
             $this->pinAdmin($conf['pinbackup'], 1);
         }
-        $conf['pinbackup'] = $this->upload("{$bot}_export_" . date('d_m_Y_H_i') . '.json', $json, $c['admin'][0])['result']['message_id'];
+        $conf['pinbackup'] = $this->upload($name, $json, $c['admin'][0])['result']['message_id'];
         $this->setPacConf($conf);
         $this->pinAdmin($conf['pinbackup']);
+    }
+
+    private function backups(): BackupRepository
+    {
+        if ($this->backupRepository) {
+            return $this->backupRepository;
+        }
+
+        $db = new Database();
+        (new MigrationRunner($db->pdo()))->migrate();
+
+        return $this->backupRepository = new BackupRepository($db->pdo());
     }
 
     public function checkVersion()
