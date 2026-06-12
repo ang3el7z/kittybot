@@ -33,7 +33,7 @@ override.php
 docker-compose.override.yml
 docker-compose.services.yml
 backup.json
-backups/
+/backups/
 app/webapp/override/
 .rest
 

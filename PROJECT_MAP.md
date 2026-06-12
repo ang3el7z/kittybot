@@ -59,6 +59,7 @@ Optional:
 - `HwidRepository` mirrors HWID device state into SQLite and keeps `/config/hwid.json`.
 - `AdminRepository` owns Telegram admins and mirrors back to `app/config.php` during admin edits.
 - `BackupRepository` stores local bot exports for Telegram backup history.
+- `BackupHistoryService` owns local backup naming/history access over `BackupRepository`.
 - `ServiceStateRepository` persists enabled/disabled optional container state.
 - `SqliteSessionHandler` stores PHP bot sessions in SQLite `bot_sessions`.
 - `SessionState` owns bot runtime session state: reply flow, PAC proxy-entry flag, and HWID tokens.

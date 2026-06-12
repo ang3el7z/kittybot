@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/src/Autoload.php';
 
+use KittyBot\Backups\BackupHistoryService;
 use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
@@ -31,10 +32,10 @@ class Bot
     public $reg;
     public $pool;
     public $hwid;
+    private ?BackupHistoryService $backupHistory = null;
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
     private ?ClientsRepository $clientsRepository = null;
-    private ?BackupRepository $backupRepository = null;
     private ?Database $database = null;
     private ?HwidRepository $hwidRepository = null;
     private ?AdminRepository $adminRepository = null;
@@ -1783,11 +1784,10 @@ class Bot
     {
         $admin = $this->admins()[0] ?? null;
         $conf = $this->getPacConf();
-        $bot  = preg_replace('~[\W]~iu', '_', $this->request('getMyName', [])['result']['name']);
         $json = $this->export();
-        $name = "{$bot}_export_" . date('d_m_Y_H_i') . '.json';
+        $name = 'kittybot_export_' . date('d_m_Y_H_i') . '.json';
         try {
-            $this->backups()->add($name, $json);
+            $name = $this->backupHistory()->storeExport($this->request('getMyName', [])['result']['name'], $json);
         } catch (Throwable $e) {
             file_put_contents('/logs/php_error', "backup history: {$e->getMessage()}\n", FILE_APPEND);
         }
@@ -1806,15 +1806,13 @@ class Bot
         $this->pinAdmin($conf['pinbackup']);
     }
 
-    private function backups(): BackupRepository
+    private function backupHistory(): BackupHistoryService
     {
-        if ($this->backupRepository) {
-            return $this->backupRepository;
+        if ($this->backupHistory) {
+            return $this->backupHistory;
         }
 
-        $db = $this->database();
-
-        return $this->backupRepository = new BackupRepository($db->pdo());
+        return $this->backupHistory = new BackupHistoryService(new BackupRepository($this->database()->pdo()));
     }
 
     public function checkVersion()
@@ -9449,7 +9447,7 @@ DNS-over-HTTPS with IP:
     public function backupsMenu()
     {
         try {
-            $backups = $this->backups()->list(10);
+            $backups = $this->backupHistory()->recent(10);
         } catch (Throwable $e) {
             $this->update($this->input['chat'], $this->input['message_id'], 'Backups error: ' . $e->getMessage(), [
                 [[
@@ -9484,7 +9482,7 @@ DNS-over-HTTPS with IP:
     public function backupGet(int $id)
     {
         try {
-            $payload = $this->backups()->payload($id);
+            $payload = $this->backupHistory()->payload($id);
             if ($payload === null) {
                 $this->answer($this->input['callback_id'], 'backup not found');
                 return;
@@ -9492,7 +9490,7 @@ DNS-over-HTTPS with IP:
 
             $this->sendFile(
                 $this->input['chat'],
-                new CURLStringFile($payload, "kittybot_backup_$id.json", 'application/json'),
+                new CURLStringFile($payload, $this->backupHistory()->filename($id), 'application/json'),
             );
             $this->answer($this->input['callback_id'], 'sent');
         } catch (Throwable $e) {
