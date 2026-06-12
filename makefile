@@ -66,7 +66,7 @@ reset:
 	make d
 	git reset --hard
 	git clean -fd
-	docker volume rm vpnbot_adguard vpnbot_warp
+	docker volume rm kittybot_adguard kittybot_warp
 	make u
 backup:
 	docker compose exec php php backup.php > backup.json

@@ -24,9 +24,8 @@ make r
 ```
 #### autoload:
 ```shell
-crontab -e
+make cron
 ```
-add `@reboot cd /root/kittybot && make r` and save
 
 ## Runtime state
 
