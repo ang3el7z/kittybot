@@ -106,7 +106,8 @@ final class BackupRestoreService
         $restart($xray);
         $syncClients();
 
-        $domain = $pac['transport'] != 'Reality'
+        $transport = $pac['transport'] ?? null;
+        $domain = $transport !== 'Reality'
             ? 't'
             : ($pac['reality']['domain'] ?? $xray['inbounds'][0]['streamSettings']['realitySettings']['serverNames'][0] ?? 't');
 
