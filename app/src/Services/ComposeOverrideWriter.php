@@ -4,7 +4,7 @@ namespace KittyBot\Services;
 
 final class ComposeOverrideWriter
 {
-    public function __construct(private string $path = '/docker/compose')
+    public function __construct(private string $path = '/docker/services-compose')
     {
     }
 

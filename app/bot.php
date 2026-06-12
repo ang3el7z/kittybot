@@ -8885,7 +8885,7 @@ DNS-over-HTTPS with IP:
 
         return $this->containerService = new ContainerService(
             new ServiceStateRepository($db->pdo()),
-            new ComposeOverrideWriter(getenv('KITTYBOT_COMPOSE_OVERRIDE') ?: '/docker/compose'),
+            new ComposeOverrideWriter(getenv('KITTYBOT_SERVICES_COMPOSE') ?: '/docker/services-compose'),
             new DockerClient(),
         );
     }

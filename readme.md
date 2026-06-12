@@ -33,6 +33,7 @@ make cron
 - Local config template: `.env.example`
 - Local runtime config: `.env`
 - Generated compose override: `docker-compose.override.yml`
+- Generated service-state override: `docker-compose.services.yml`
 
 Optional containers can be disabled from the bot in `Settings -> Services`.
 Disabled containers stay disabled across restarts until enabled again.

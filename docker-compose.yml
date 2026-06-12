@@ -135,11 +135,13 @@ services:
             - ./.git:/.git
             - ./singbox_windows:/singbox
             - ./docker-compose.override.yml:/docker/compose
+            - ./docker-compose.services.yml:/docker/services-compose
             - /var/run/docker.sock:/var/run/docker.sock:ro
         environment:
             IP: ${IP}
             VER: ${VER}
             KITTYBOT_DB: ${KITTYBOT_DB:-/data/kittybot.sqlite}
+            KITTYBOT_SERVICES_COMPOSE: ${KITTYBOT_SERVICES_COMPOSE:-/docker/services-compose}
         env_file:
             - path: ./.env
               required: true # default
@@ -182,11 +184,13 @@ services:
             - ./.git:/.git
             - ./scripts/start_service.sh:/start_service.sh
             - ./docker-compose.override.yml:/docker/compose
+            - ./docker-compose.services.yml:/docker/services-compose
             - /var/run/docker.sock:/var/run/docker.sock:ro
         environment:
             IP: ${IP}
             VER: ${VER}
             KITTYBOT_DB: ${KITTYBOT_DB:-/data/kittybot.sqlite}
+            KITTYBOT_SERVICES_COMPOSE: ${KITTYBOT_SERVICES_COMPOSE:-/docker/services-compose}
         env_file:
             - path: ./.env
               required: true # default
