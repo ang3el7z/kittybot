@@ -6,10 +6,7 @@ use KittyBot\Storage\BackupRepository;
 
 final class BackupHistoryService
 {
-    public function __construct(
-        private BackupRepository $repository,
-        private ?BackupPayloadCodec $codec = null,
-    )
+    public function __construct(private BackupRepository $repository)
     {
     }
 
@@ -36,10 +33,5 @@ final class BackupHistoryService
     public function filename(int $id): string
     {
         return "kittybot_backup_$id.json";
-    }
-
-    public function codec(): BackupPayloadCodec
-    {
-        return $this->codec ??= new BackupPayloadCodec();
     }
 }

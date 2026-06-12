@@ -3,6 +3,7 @@
 require_once __DIR__ . '/src/Autoload.php';
 
 use KittyBot\Backups\BackupHistoryService;
+use KittyBot\Backups\BackupImportService;
 use KittyBot\Backups\BackupPayloadCodec;
 use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
@@ -35,6 +36,7 @@ class Bot
     public $hwid;
     private ?BackupPayloadCodec $backupCodec = null;
     private ?BackupHistoryService $backupHistory = null;
+    private ?BackupImportService $backupImport = null;
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
     private ?ClientsRepository $clientsRepository = null;
@@ -1816,8 +1818,16 @@ class Bot
 
         return $this->backupHistory = new BackupHistoryService(
             new BackupRepository($this->database()->pdo(), $this->backupCodec()),
-            $this->backupCodec(),
         );
+    }
+
+    private function backupImport(): BackupImportService
+    {
+        if ($this->backupImport) {
+            return $this->backupImport;
+        }
+
+        return $this->backupImport = new BackupImportService($this->backupCodec());
     }
 
     private function backupCodec(): BackupPayloadCodec
@@ -2049,17 +2059,19 @@ class Bot
 
     public function importFile($file = false)
     {
-        if (!empty($file)) {
-            $json = $this->backupCodec()->decode(file_get_contents($file));
-        } else {
-            $r    = $this->request('getFile', ['file_id' => $this->input['file_id']]);
-            $json = $this->backupCodec()->decode(file_get_contents($this->file . $r['result']['file_path']));
+        try {
+            if (!empty($file)) {
+                $json = $this->backupImport()->fromPath($file);
+            } else {
+                $r    = $this->request('getFile', ['file_id' => $this->input['file_id']]);
+                $json = $this->backupImport()->fromUrl($this->file . $r['result']['file_path']);
+            }
+        } catch (\InvalidArgumentException $e) {
+            $this->answer($this->input['callback_id'], $e->getMessage(), true);
+            return;
         }
-        if (empty($json) || !is_array($json)) {
-            $this->answer($this->input['callback_id'], 'error', true);
-        } elseif (!$this->backupCodec()->supports($json)) {
-            $this->answer($this->input['callback_id'], 'unsupported backup format', true);
-        } else {
+
+        if (!empty($json) && is_array($json)) {
             // certs
             if (!empty($json['ssl'])) {
                 $out[] = 'update certificates';
