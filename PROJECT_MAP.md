@@ -70,3 +70,4 @@ Optional:
 - `WireGuardClientStore` owns WireGuard client persistence: SQLite seed/read/write plus legacy `/config/clients*.json` mirrors for scripts.
 - `WireGuardConfigCodec` owns WireGuard `.conf` parsing/rendering while `bot.php` still owns SSH reads and restarts.
 - `WireGuardStatusCodec` owns WireGuard runtime status parsing and peer lookup.
+- `WireGuardNameResolver` owns WireGuard client/peer display-name resolution from config comments and address fields.

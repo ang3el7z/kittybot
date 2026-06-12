@@ -22,6 +22,7 @@ use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
 use KittyBot\WireGuard\WireGuardConfigCodec;
 use KittyBot\WireGuard\WireGuardClientStore;
+use KittyBot\WireGuard\WireGuardNameResolver;
 use KittyBot\WireGuard\WireGuardStatusCodec;
 
 class Bot
@@ -52,6 +53,7 @@ class Bot
     private ?AdminRepository $adminRepository = null;
     private ?SessionState $sessionState = null;
     private ?WireGuardConfigCodec $wireGuardConfigCodec = null;
+    private ?WireGuardNameResolver $wireGuardNameResolver = null;
     private ?WireGuardStatusCodec $wireGuardStatusCodec = null;
     private ?array $pacConfCache = null;
 
@@ -9685,14 +9687,7 @@ DNS-over-HTTPS with IP:
 
     public function getName(array $a): string
     {
-        $name = '';
-        foreach ($a as $k => $v) {
-            if (preg_match('~^#.*name$~', $k)) {
-                $name = $v;
-            }
-        }
-        $name = $name ?: $a['AllowedIPs'] ?: $a['Address'];
-        return $name;
+        return $this->wireGuardNameResolver()->name($a);
     }
 
     public function createConfig($data)
@@ -9877,6 +9872,15 @@ DNS-over-HTTPS with IP:
         }
 
         return $this->wireGuardConfigCodec = new WireGuardConfigCodec();
+    }
+
+    private function wireGuardNameResolver(): WireGuardNameResolver
+    {
+        if ($this->wireGuardNameResolver) {
+            return $this->wireGuardNameResolver;
+        }
+
+        return $this->wireGuardNameResolver = new WireGuardNameResolver();
     }
 
     private function wireGuardStatusCodec(): WireGuardStatusCodec
