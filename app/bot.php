@@ -2093,17 +2093,17 @@ class Bot
             if (!empty($json['pac'])) {
                 $out[] = 'update pac';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                if ($this->getPacConf()['amnezia'] != $json['pac']['amnezia']) {
-                    $switch_amnezia = 1;
-                }
-                if ($this->getPacConf()['wg1_amnezia'] != $json['pac']['wg1_amnezia']) {
-                    $switch_wg1amnezia = 1;
-                }
-                $this->setPacConf($json['pac']);
+                $pacRestore = $this->backupRestore()->applyPac(
+                    $json['pac'],
+                    fn() => $this->getPacConf(),
+                    fn(array $pac) => $this->setPacConf($pac),
+                    fn() => $this->restartNaive(),
+                    fn(string $import = '') => $this->pacUpdate($import),
+                );
+                $switch_amnezia = $pacRestore['switch_amnezia'];
+                $switch_wg1amnezia = $pacRestore['switch_wg1amnezia'];
                 $out[] = 'update naiveproxy';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->restartNaive();
-                $this->pacUpdate('1');
             }
             // wg
             if (!empty($json['wg'])) {
@@ -2138,17 +2138,19 @@ class Bot
             if (!empty($json['ss'])) {
                 $out[] = 'update shadowsocks server';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->ssh('pkill ssserver', 'ss');
-                file_put_contents('/config/ssserver.json', json_encode($json['ss'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-                $this->ssh('ssserver -v -d -c /config.json', 'ss');
+                $this->backupRestore()->applyShadowsocksServer(
+                    $json['ss'],
+                    fn(string $command, string $service) => $this->ssh($command, $service),
+                );
             }
             // sl
             if (!empty($json['sl'])) {
                 $out[] = 'update shadowsocks proxy';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->ssh('pkill sslocal', 'proxy');
-                file_put_contents('/config/sslocal.json', json_encode($json['sl'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-                $this->ssh('sslocal -v -d -c /config.json', 'proxy');
+                $this->backupRestore()->applyShadowsocksProxy(
+                    $json['sl'],
+                    fn(string $command, string $service) => $this->ssh($command, $service),
+                );
             }
             // mtproto
             if (!empty($json['mtproto'])) {

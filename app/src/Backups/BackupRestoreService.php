@@ -29,6 +29,47 @@ final class BackupRestoreService
         $start();
     }
 
+    /** @param array<string,mixed> $pac
+     *  @return array{switch_amnezia:int,switch_wg1amnezia:int}
+     */
+    public function applyPac(array $pac, callable $getCurrent, callable $setPac, callable $restartNaive, callable $pacUpdate): array
+    {
+        $current = $getCurrent();
+        $switchAmnezia = (($current['amnezia'] ?? null) != ($pac['amnezia'] ?? null)) ? 1 : 0;
+        $switchWg1Amnezia = (($current['wg1_amnezia'] ?? null) != ($pac['wg1_amnezia'] ?? null)) ? 1 : 0;
+
+        $setPac($pac);
+        $restartNaive();
+        $pacUpdate('1');
+
+        return [
+            'switch_amnezia' => $switchAmnezia,
+            'switch_wg1amnezia' => $switchWg1Amnezia,
+        ];
+    }
+
+    /** @param array<string,mixed> $config */
+    public function applyShadowsocksServer(array $config, callable $command): void
+    {
+        $command('pkill ssserver', 'ss');
+        file_put_contents(
+            '/config/ssserver.json',
+            json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+        $command('ssserver -v -d -c /config.json', 'ss');
+    }
+
+    /** @param array<string,mixed> $config */
+    public function applyShadowsocksProxy(array $config, callable $command): void
+    {
+        $command('pkill sslocal', 'proxy');
+        file_put_contents(
+            '/config/sslocal.json',
+            json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+        $command('sslocal -v -d -c /config.json', 'proxy');
+    }
+
     public function applyMtproto(string $secret, ?string $domain, callable $restart): void
     {
         file_put_contents('/config/mtprotosecret', $secret);
