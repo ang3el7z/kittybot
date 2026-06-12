@@ -22,6 +22,7 @@ use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
 use KittyBot\WireGuard\WireGuardConfigCodec;
 use KittyBot\WireGuard\WireGuardClientStore;
+use KittyBot\WireGuard\WireGuardStatusCodec;
 
 class Bot
 {
@@ -51,6 +52,7 @@ class Bot
     private ?AdminRepository $adminRepository = null;
     private ?SessionState $sessionState = null;
     private ?WireGuardConfigCodec $wireGuardConfigCodec = null;
+    private ?WireGuardStatusCodec $wireGuardStatusCodec = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -9649,11 +9651,7 @@ DNS-over-HTTPS with IP:
 
     public function getStatusPeer(string $publickey, array $peers)
     {
-        foreach ($peers as $k => $v) {
-            if ($v['peer'] == $publickey) {
-                return $v;
-            }
-        }
+        return $this->wireGuardStatusCodec()->findPeer($publickey, $peers);
     }
 
     public function getInstanceWG($k = false)
@@ -9680,32 +9678,9 @@ DNS-over-HTTPS with IP:
 
     public function readStatus()
     {
-        $r = $this->ssh($this->getWGType(), $this->getInstanceWG());
-        $r = explode(PHP_EOL, $r);
-        $r = array_filter($r);
-        $i = 0;
-        foreach ($r as $k => $v) {
-            if (preg_match('~^(interface|peer):~', $v, $m)) {
-                $i++;
-                if ($m[1] == 'interface') {
-                    $data[$i]['type'] = 'interface';
-                } else {
-                    $data[$i]['type'] = 'peer';
-                }
-            }
-            $t = explode(':', $v, 2);
-            $data[$i][trim($t[0])] = trim($t[1]);
-        }
-        foreach ($data as $v) {
-            $type = $v['type'];
-            unset($v['type']);
-            if ($type == 'interface') {
-                $d['interface'] = $v;
-            } else {
-                $d['peers'][] = $v;
-            }
-        }
-        return $d;
+        return $this->wireGuardStatusCodec()->parse(
+            $this->ssh($this->getWGType(), $this->getInstanceWG())
+        );
     }
 
     public function getName(array $a): string
@@ -9902,6 +9877,15 @@ DNS-over-HTTPS with IP:
         }
 
         return $this->wireGuardConfigCodec = new WireGuardConfigCodec();
+    }
+
+    private function wireGuardStatusCodec(): WireGuardStatusCodec
+    {
+        if ($this->wireGuardStatusCodec) {
+            return $this->wireGuardStatusCodec;
+        }
+
+        return $this->wireGuardStatusCodec = new WireGuardStatusCodec();
     }
 
     private function clientScope(): string

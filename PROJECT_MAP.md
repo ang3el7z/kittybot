@@ -69,3 +69,4 @@ Optional:
 - `SessionState` owns bot runtime session state: reply flow, PAC proxy-entry flag, and HWID tokens.
 - `WireGuardClientStore` owns WireGuard client persistence: SQLite seed/read/write plus legacy `/config/clients*.json` mirrors for scripts.
 - `WireGuardConfigCodec` owns WireGuard `.conf` parsing/rendering while `bot.php` still owns SSH reads and restarts.
+- `WireGuardStatusCodec` owns WireGuard runtime status parsing and peer lookup.
