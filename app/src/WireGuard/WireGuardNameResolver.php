@@ -7,12 +7,13 @@ final class WireGuardNameResolver
     /** @param array<string,mixed> $peer */
     public function name(array $peer): string
     {
+        $name = '';
         foreach ($peer as $key => $value) {
             if (preg_match('~^#.*name$~', (string) $key)) {
-                return (string) $value;
+                $name = (string) $value;
             }
         }
 
-        return (string) ($peer['AllowedIPs'] ?? $peer['Address'] ?? '');
+        return $name !== '' ? $name : (string) ($peer['AllowedIPs'] ?? $peer['Address'] ?? '');
     }
 }
