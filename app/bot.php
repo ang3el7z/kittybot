@@ -20,6 +20,7 @@ use KittyBot\Storage\MigrationRunner;
 use KittyBot\Storage\SessionState;
 use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
+use KittyBot\WireGuard\WireGuardConfigCodec;
 use KittyBot\WireGuard\WireGuardClientStore;
 
 class Bot
@@ -49,6 +50,7 @@ class Bot
     private ?HwidRepository $hwidRepository = null;
     private ?AdminRepository $adminRepository = null;
     private ?SessionState $sessionState = null;
+    private ?WireGuardConfigCodec $wireGuardConfigCodec = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -9664,33 +9666,9 @@ DNS-over-HTTPS with IP:
 
     public function readConfig()
     {
-        $r = $this->ssh('cat /etc/wireguard/wg0.conf', $this->getInstanceWG());
-        $r = explode(PHP_EOL, $r);
-        $r = array_filter($r);
-        $i = 0;
-        foreach ($r as $k => $v) {
-            if (preg_match('~\[(.+)\]~', $v, $m)) {
-                $i++;
-                if ($m[1] == 'Interface') {
-                    $data[$i]['type'] = 'interface';
-                } else {
-                    $data[$i]['type'] = 'peer';
-                }
-            } else {
-                $t = explode('=', $v, 2);
-                $data[$i][trim($t[0])] = trim($t[1]);
-            }
-        }
-        foreach ($data as $v) {
-            $type = $v['type'];
-            unset($v['type']);
-            if ($type == 'interface') {
-                $d['interface'] = $v;
-            } else {
-                $d['peers'][] = $v;
-            }
-        }
-        return $d;
+        return $this->wireGuardConfigCodec()->parse(
+            $this->ssh('cat /etc/wireguard/wg0.conf', $this->getInstanceWG())
+        );
     }
 
     public function nginxGetTypeCert()
@@ -9745,31 +9723,15 @@ DNS-over-HTTPS with IP:
     public function createConfig($data)
     {
         $pac = $this->getPacConf();
-        $conf[] = "[Interface]";
-        if (empty($data['interface']['ListenPort'])) {
-            if (empty($data['interface']['DNS'])) {
-                $data['interface']['DNS'] = $pac[$this->getInstanceWG(1) . 'dns'] ?: $this->dns;
-            }
-            if (empty($data['interface']['MTU'])) {
-                $data['interface']['MTU'] = $pac[$this->getInstanceWG(1) . 'mtu'] ?: $this->mtu;
-            }
-        }
-        foreach ($data['interface'] as $k => $v) {
-            $conf[] = "$k = $v";
-        }
-        if (!empty($data['peers'])) {
-            foreach ($data['peers'] as $peer) {
-                $conf[] = '';
-                $conf[] = $peer['# PublicKey'] ? '# [Peer]' : '[Peer]';
-                if (!empty($peer['Endpoint'])) {
-                    $peer['Endpoint'] = ($pac[$this->getInstanceWG(1) . 'endpoint'] ? $this->ip : $this->getDomain()) . ":" . getenv($this->getInstanceWG(1) ? 'WG1PORT' : 'WGPORT');
-                }
-                foreach ($peer as $k => $v) {
-                    $conf[] = "$k = $v";
-                }
-            }
-        }
-        return implode(PHP_EOL, $conf);
+        $prefix = $this->getInstanceWG(1);
+
+        return $this->wireGuardConfigCodec()->render(
+            $data,
+            $pac[$prefix . 'dns'] ?: $this->dns,
+            $pac[$prefix . 'mtu'] ?: $this->mtu,
+            $pac[$prefix . 'endpoint'] ? $this->ip : $this->getDomain(),
+            getenv($prefix ? 'WG1PORT' : 'WGPORT')
+        );
     }
 
     public function presharedKey()
@@ -9931,6 +9893,15 @@ DNS-over-HTTPS with IP:
             $this->clients,
             $this->clients1
         );
+    }
+
+    private function wireGuardConfigCodec(): WireGuardConfigCodec
+    {
+        if ($this->wireGuardConfigCodec) {
+            return $this->wireGuardConfigCodec;
+        }
+
+        return $this->wireGuardConfigCodec = new WireGuardConfigCodec();
     }
 
     private function clientScope(): string
