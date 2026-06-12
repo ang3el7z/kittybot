@@ -26,12 +26,21 @@ final class ContainerService
         return $this->states->isEnabled($service);
     }
 
-    public function enable(string $service): void
+    public function enable(string $service): bool
     {
         $this->assertOptional($service);
         $this->states->setEnabled($service, true);
         $this->override->write($this->states->all());
-        $this->docker->action($service, 'start');
+
+        try {
+            $this->docker->action($service, 'start');
+            return true;
+        } catch (\RuntimeException $e) {
+            if (str_contains($e->getMessage(), 'not found')) {
+                return false;
+            }
+            throw $e;
+        }
     }
 
     public function disable(string $service): void

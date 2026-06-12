@@ -8881,18 +8881,34 @@ DNS-over-HTTPS with IP:
 
     public function serviceAction(string $service, string $action)
     {
+        $needsRestart = false;
         try {
             $manager = $this->containers();
-            match ($action) {
-                'start' => $manager->start($service),
-                'stop' => $manager->stop($service),
-                'restart' => $manager->restart($service),
-                'enable' => $manager->enable($service),
-                'disable' => $manager->disable($service),
-            };
+            switch ($action) {
+                case 'start':
+                    $manager->start($service);
+                    break;
+                case 'stop':
+                    $manager->stop($service);
+                    break;
+                case 'restart':
+                    $manager->restart($service);
+                    break;
+                case 'enable':
+                    $needsRestart = !$manager->enable($service);
+                    break;
+                case 'disable':
+                    $manager->disable($service);
+                    break;
+            }
             $this->answer($this->input['callback_id'], "$action $service: ok");
         } catch (Throwable $e) {
             $this->answer($this->input['callback_id'], "$action $service: " . $e->getMessage());
+        }
+
+        if ($needsRestart) {
+            $this->restart();
+            return;
         }
 
         $this->servicesMenu();
