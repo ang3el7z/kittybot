@@ -62,7 +62,7 @@ Optional:
 - `BackupHistoryService` owns local backup naming/history access over `BackupRepository`.
 - `BackupPayloadCodec` owns backup JSON encode/decode and schema-version validation.
 - `BackupImportService` owns backup payload loading/validation before apply.
-- `BackupRestoreService` owns simple backup restore sections: certs, dnstt, hwid normalization, service states.
+- `BackupRestoreService` owns simple and medium backup restore sections: certs, dnstt, hwid normalization, service states, adguard, mtproto, ocserv, hysteria.
 - `ServiceStateRepository` persists enabled/disabled optional container state.
 - `SqliteSessionHandler` stores PHP bot sessions in SQLite `bot_sessions`.
 - `SessionState` owns bot runtime session state: reply flow, PAC proxy-entry flag, and HWID tokens.

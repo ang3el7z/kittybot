@@ -2127,9 +2127,12 @@ class Bot
             if (!empty($json['ad'])) {
                 $out[] = 'update adguard';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->stopAd();
-                yaml_emit_file($this->adguard, $json['ad']);
-                $this->startAd();
+                $this->backupRestore()->applyAdguard(
+                    $json['ad'],
+                    $this->adguard,
+                    fn() => $this->stopAd(),
+                    fn() => $this->startAd(),
+                );
             }
             // ss
             if (!empty($json['ss'])) {
@@ -2151,9 +2154,11 @@ class Bot
             if (!empty($json['mtproto'])) {
                 $out[] = 'update mtproto';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                file_put_contents('/config/mtprotosecret', $json['mtproto']);
-                file_put_contents('/config/mtprotodomain', $json['mtprotodomain'] ?: '');
-                $this->restartTG();
+                $this->backupRestore()->applyMtproto(
+                    $json['mtproto'],
+                    $json['mtprotodomain'] ?? '',
+                    fn() => $this->restartTG(),
+                );
             }
             // hwid
             if (array_key_exists('hwid', $json)) {
@@ -2180,15 +2185,20 @@ class Bot
             if (!empty($json['oc'])) {
                 $out[] = 'update ocserv';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                file_put_contents('/config/ocserv.passwd', $json['ocu']);
-                $this->restartOcserv($json['oc']);
+                $this->backupRestore()->applyOcserv(
+                    $json['oc'],
+                    $json['ocu'],
+                    fn(string $config) => $this->restartOcserv($config),
+                );
             }
             // hysteria
             if (!empty($json['hy'])) {
                 $out[] = 'update hysteria';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                yaml_emit_file('/config/hysteria.yaml', $json['hy']);
-                $this->restartHysteria();
+                $this->backupRestore()->applyHysteria(
+                    $json['hy'],
+                    fn() => $this->restartHysteria(),
+                );
             }
             if (!empty($json['pac']['domain'])) {
                 $this->setUpstreamDomainOcserv($json['pac']['domain']);

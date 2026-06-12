@@ -21,6 +21,34 @@ final class BackupRestoreService
         file_put_contents('/config/dnstt/server.pub', $dnstt['public']);
     }
 
+    /** @param array<string,mixed> $config */
+    public function applyAdguard(array $config, string $path, callable $stop, callable $start): void
+    {
+        $stop();
+        yaml_emit_file($path, $config);
+        $start();
+    }
+
+    public function applyMtproto(string $secret, ?string $domain, callable $restart): void
+    {
+        file_put_contents('/config/mtprotosecret', $secret);
+        file_put_contents('/config/mtprotodomain', $domain ?: '');
+        $restart();
+    }
+
+    public function applyOcserv(string $config, string $passwd, callable $restart): void
+    {
+        file_put_contents('/config/ocserv.passwd', $passwd);
+        $restart($config);
+    }
+
+    /** @param array<string,mixed> $config */
+    public function applyHysteria(array $config, callable $restart): void
+    {
+        yaml_emit_file('/config/hysteria.yaml', $config);
+        $restart();
+    }
+
     /** @return array<string,mixed> */
     public function normalizeHwid(mixed $hwid): array
     {
