@@ -12,9 +12,9 @@ use KittyBot\Storage\ClientsRepository;
 use KittyBot\Storage\Database;
 use KittyBot\Storage\HwidRepository;
 use KittyBot\Storage\MigrationRunner;
+use KittyBot\Storage\SessionState;
 use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
-use KittyBot\Storage\SqliteSessionHandler;
 
 class Bot
 {
@@ -38,6 +38,7 @@ class Bot
     private ?Database $database = null;
     private ?HwidRepository $hwidRepository = null;
     private ?AdminRepository $adminRepository = null;
+    private ?SessionState $sessionState = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -142,19 +143,16 @@ class Bot
 
     public function session()
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_set_save_handler(new SqliteSessionHandler($this->database()->pdo()), true);
-            session_id((string) $this->input['from']);
-            session_start();
-        }
+        $session = $this->sessions();
+        $session->start((string) $this->input['from'], $this->database()->pdo());
 
-        $replies = $this->sessionReplies();
+        $replies = $session->replies();
         if (!empty($replies)) {
             if (empty($this->input['reply'])) {
                 foreach ($replies as $k => $v) {
                     $this->delete($this->input['chat'], $k);
                 }
-                $this->clearSessionReplies();
+                $session->clearReplies();
             }
         }
     }
@@ -162,97 +160,75 @@ class Bot
     /** @return array<int|string,array<string,mixed>> */
     private function sessionReplies(): array
     {
-        return !empty($_SESSION['reply']) && is_array($_SESSION['reply']) ? $_SESSION['reply'] : [];
+        return $this->sessions()->replies();
     }
 
     /** @return array<string,mixed>|null */
     private function sessionReply(int|string|null $messageId): ?array
     {
-        if ($messageId === null) {
-            return null;
-        }
-
-        $reply = $this->sessionReplies()[$messageId] ?? null;
-        return is_array($reply) ? $reply : null;
+        return $this->sessions()->reply($messageId);
     }
 
     private function clearSessionReplies(): void
     {
-        unset($_SESSION['reply']);
+        $this->sessions()->clearReplies();
     }
 
     /** @param array<string,mixed> $reply */
     private function rememberReply(int|string $messageId, array $reply): void
     {
-        $_SESSION['reply'][$messageId] = $reply;
+        $this->sessions()->rememberReply($messageId, $reply);
     }
 
     private function removeSessionReply(int|string $messageId): void
     {
-        unset($_SESSION['reply'][$messageId]);
-        if (empty($_SESSION['reply'])) {
-            unset($_SESSION['reply']);
-        }
+        $this->sessions()->removeReply($messageId);
     }
 
     /** @return list<mixed> */
     private function sessionReplyArgs(int|string|null $messageId): array
     {
-        $reply = $this->sessionReply($messageId);
-        return !empty($reply['args']) && is_array($reply['args']) ? array_values($reply['args']) : [];
+        return $this->sessions()->replyArgs($messageId);
     }
 
     private function proxyListEntryEnabled(): bool
     {
-        return !empty($_SESSION['proxylistentry']);
+        return $this->sessions()->proxyListEntryEnabled();
     }
 
     private function setProxyListEntryEnabled(bool $enabled): void
     {
-        if ($enabled) {
-            $_SESSION['proxylistentry'] = 1;
-            return;
-        }
-
-        unset($_SESSION['proxylistentry']);
+        $this->sessions()->setProxyListEntryEnabled($enabled);
     }
 
     /** @return array<string,string> */
     private function hwidTokenPool(string $scope): array
     {
-        if (empty($_SESSION['hwidTokens']) || !is_array($_SESSION['hwidTokens'])) {
-            $_SESSION['hwidTokens'] = [];
-        }
-        if (empty($_SESSION['hwidTokens'][$scope]) || !is_array($_SESSION['hwidTokens'][$scope])) {
-            $_SESSION['hwidTokens'][$scope] = [];
-        }
-
-        return $_SESSION['hwidTokens'][$scope];
+        return $this->sessions()->hwidTokenPool($scope);
     }
 
     private function rememberHwidSessionToken(string $scope, string $token, string $hwid): void
     {
-        $this->hwidTokenPool($scope);
-        $_SESSION['hwidTokens'][$scope][$token] = $hwid;
+        $this->sessions()->rememberHwidToken($scope, $token, $hwid);
     }
 
     private function consumeHwidSessionToken(string $scope, string $token): ?string
     {
-        $pool = $this->hwidTokenPool($scope);
-        if (!isset($pool[$token])) {
-            return null;
-        }
-
-        $hwid = $pool[$token];
-        unset($_SESSION['hwidTokens'][$scope][$token]);
-
-        return $hwid;
+        return $this->sessions()->consumeHwidToken($scope, $token);
     }
 
     private function clearHwidSessionTokens(string $scope): void
     {
-        $this->hwidTokenPool($scope);
-        $_SESSION['hwidTokens'][$scope] = [];
+        $this->sessions()->clearHwidTokens($scope);
+    }
+
+    private function sessions(): SessionState
+    {
+        if ($this->sessionState) {
+            return $this->sessionState;
+        }
+
+        return $this->sessionState = new SessionState();
     }
 
     public function sd($var, $log = false, $json = false, $raw = false)
