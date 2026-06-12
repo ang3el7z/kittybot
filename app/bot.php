@@ -32,6 +32,7 @@ class Bot
     private ?SettingsRepository $settingsRepository = null;
     private ?ClientsRepository $clientsRepository = null;
     private ?BackupRepository $backupRepository = null;
+    private ?Database $database = null;
     private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
@@ -1710,8 +1711,7 @@ class Bot
             return $this->backupRepository;
         }
 
-        $db = new Database();
-        (new MigrationRunner($db->pdo()))->migrate();
+        $db = $this->database();
 
         return $this->backupRepository = new BackupRepository($db->pdo());
     }
@@ -2619,10 +2619,21 @@ class Bot
             return $this->settingsRepository;
         }
 
-        $db = new Database();
-        (new MigrationRunner($db->pdo()))->migrate();
+        $db = $this->database();
 
         return $this->settingsRepository = new SettingsRepository($db->pdo());
+    }
+
+    private function database(): Database
+    {
+        if ($this->database) {
+            return $this->database;
+        }
+
+        $this->database = new Database();
+        (new MigrationRunner($this->database->pdo()))->migrate();
+
+        return $this->database;
     }
 
     public function domain()
@@ -8851,8 +8862,7 @@ DNS-over-HTTPS with IP:
             return $this->containerService;
         }
 
-        $db = new Database();
-        (new MigrationRunner($db->pdo()))->migrate();
+        $db = $this->database();
 
         return $this->containerService = new ContainerService(
             new ServiceStateRepository($db->pdo()),
@@ -9839,8 +9849,7 @@ DNS-over-HTTPS with IP:
             return $this->clientsRepository;
         }
 
-        $db = new Database();
-        (new MigrationRunner($db->pdo()))->migrate();
+        $db = $this->database();
 
         return $this->clientsRepository = new ClientsRepository($db->pdo());
     }
