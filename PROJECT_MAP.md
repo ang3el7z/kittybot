@@ -58,6 +58,7 @@ Optional:
 - `ClientsRepository` mirrors WireGuard clients into SQLite and keeps legacy client JSON files for scripts.
 - `HwidRepository` mirrors HWID device state into SQLite and keeps `/config/hwid.json`.
 - `HwidStore` owns HWID persistence flow: legacy `/config/hwid.json` seeding, SQLite reads/writes, and mirror updates.
+- `HwidDeviceRegistry` owns HWID device CRUD over `HwidStore`; UI/request code delegates through bot wrappers.
 - `AdminRepository` owns Telegram admins and mirrors back to `app/config.php` during admin edits.
 - `BackupRepository` stores local bot exports for Telegram backup history.
 - `BackupHistoryService` owns local backup naming/history access over `BackupRepository`.

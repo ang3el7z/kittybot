@@ -7,6 +7,7 @@ use KittyBot\Backups\BackupApplyService;
 use KittyBot\Backups\BackupImportService;
 use KittyBot\Backups\BackupPayloadCodec;
 use KittyBot\Backups\BackupRestoreService;
+use KittyBot\Hwid\HwidDeviceRegistry;
 use KittyBot\Hwid\HwidStore;
 use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
@@ -50,6 +51,7 @@ class Bot
     private ?SettingsRepository $settingsRepository = null;
     private ?WireGuardClientStore $wireGuardClients = null;
     private ?Database $database = null;
+    private ?HwidDeviceRegistry $hwidDevices = null;
     private ?HwidStore $hwidStore = null;
     private ?AdminRepository $adminRepository = null;
     private ?SessionState $sessionState = null;
@@ -5389,38 +5391,33 @@ DNS-over-HTTPS with IP:
         );
     }
 
+    private function hwidDevices(): HwidDeviceRegistry
+    {
+        if ($this->hwidDevices) {
+            return $this->hwidDevices;
+        }
+
+        return $this->hwidDevices = new HwidDeviceRegistry($this->hwidStore());
+    }
+
     public function getHwidDevicesByUser($uid)
     {
-        $storage = $this->getHwidStorage();
-        return $storage[$uid] ?? [];
+        return $this->hwidDevices()->devicesByUser((string) $uid);
     }
 
     public function setHwidDevice($uid, $hwid, array $info)
     {
-        $storage = $this->getHwidStorage();
-        $storage[$uid][$hwid] = $info;
-        $this->setHwidStorage($storage);
+        $this->hwidDevices()->setDevice((string) $uid, (string) $hwid, $info);
     }
 
     public function deleteHwidDevice($uid, $hwid)
     {
-        $storage = $this->getHwidStorage();
-        if (isset($storage[$uid][$hwid])) {
-            unset($storage[$uid][$hwid]);
-            if (empty($storage[$uid])) {
-                unset($storage[$uid]);
-            }
-            $this->setHwidStorage($storage);
-        }
+        $this->hwidDevices()->deleteDevice((string) $uid, (string) $hwid);
     }
 
     public function deleteHwidUser($uid)
     {
-        $storage = $this->getHwidStorage();
-        if (isset($storage[$uid])) {
-            unset($storage[$uid]);
-            $this->setHwidStorage($storage);
-        }
+        $this->hwidDevices()->deleteUser((string) $uid);
     }
 
     protected function getHwidTokenScope($index)
