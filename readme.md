@@ -37,3 +37,10 @@ make cron
 
 Optional containers can be disabled from the bot in `Settings -> Services`.
 Disabled containers stay disabled across restarts until enabled again.
+
+## Backups and migrations
+
+- Bot export backups are available in Telegram: `Settings -> Backup -> backup history`.
+- The SQLite database is stored on the host in `./data/kittybot.sqlite`.
+- Migrations run automatically when the bot first opens the database.
+- Manual migration smoke test from a running stack: `docker compose exec php php bin/migrate.php`.
