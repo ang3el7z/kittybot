@@ -57,6 +57,7 @@ Optional:
 - `SettingsRepository` mirrors PAC settings into SQLite and keeps `/config/pac.json` for container compatibility.
 - `ClientsRepository` mirrors WireGuard clients into SQLite and keeps legacy client JSON files for scripts.
 - `HwidRepository` mirrors HWID device state into SQLite and keeps `/config/hwid.json`.
+- `HwidStore` owns HWID persistence flow: legacy `/config/hwid.json` seeding, SQLite reads/writes, and mirror updates.
 - `AdminRepository` owns Telegram admins and mirrors back to `app/config.php` during admin edits.
 - `BackupRepository` stores local bot exports for Telegram backup history.
 - `BackupHistoryService` owns local backup naming/history access over `BackupRepository`.

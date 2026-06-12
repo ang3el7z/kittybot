@@ -7,6 +7,7 @@ use KittyBot\Backups\BackupApplyService;
 use KittyBot\Backups\BackupImportService;
 use KittyBot\Backups\BackupPayloadCodec;
 use KittyBot\Backups\BackupRestoreService;
+use KittyBot\Hwid\HwidStore;
 use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
@@ -49,7 +50,7 @@ class Bot
     private ?SettingsRepository $settingsRepository = null;
     private ?WireGuardClientStore $wireGuardClients = null;
     private ?Database $database = null;
-    private ?HwidRepository $hwidRepository = null;
+    private ?HwidStore $hwidStore = null;
     private ?AdminRepository $adminRepository = null;
     private ?SessionState $sessionState = null;
     private ?WireGuardConfigCodec $wireGuardConfigCodec = null;
@@ -5368,33 +5369,24 @@ DNS-over-HTTPS with IP:
 
     public function getHwidStorage()
     {
-        $fallback = file_exists($this->hwid) ? (json_decode(file_get_contents($this->hwid), true) ?: []) : [];
-        try {
-            $storage = $this->hwidStorage();
-            $storage->seed($fallback);
-            return $storage->all();
-        } catch (Throwable) {
-            return is_array($fallback) ? $fallback : [];
-        }
+        return $this->hwidStore()->all();
     }
 
     public function setHwidStorage(array $storage)
     {
-        try {
-            $this->hwidStorage()->setAll($storage);
-        } catch (Throwable) {
-        }
-
-        file_put_contents($this->hwid, json_encode($storage, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->hwidStore()->setAll($storage);
     }
 
-    private function hwidStorage(): HwidRepository
+    private function hwidStore(): HwidStore
     {
-        if ($this->hwidRepository) {
-            return $this->hwidRepository;
+        if ($this->hwidStore) {
+            return $this->hwidStore;
         }
 
-        return $this->hwidRepository = new HwidRepository($this->database()->pdo());
+        return $this->hwidStore = new HwidStore(
+            new HwidRepository($this->database()->pdo()),
+            $this->hwid
+        );
     }
 
     public function getHwidDevicesByUser($uid)
