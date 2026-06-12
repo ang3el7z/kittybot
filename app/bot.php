@@ -1536,8 +1536,8 @@ class Bot
         try {
             $pac = $this->getPacConf();
             if (!empty($pac['autoscan'])) {
-                require __DIR__ . '/config.php';
-                if (!empty($c['admin']) && (empty($this->time3) || ((time() - $this->time3) > $pac['autoscan_timeout']))) {
+                $admins = $this->admins();
+                if (!empty($admins) && (empty($this->time3) || ((time() - $this->time3) > $pac['autoscan_timeout']))) {
                     $this->time3 = time();
                     $r = $this->analysisIp(return: 1);
                     if (!empty($r)) {
@@ -1560,8 +1560,8 @@ class Bot
                             }
                         }
                         if ($pac['silence'] == 0 || $pac['silence'] == 1) {
-                            foreach ($c['admin'] as $k => $v) {
-                                $this->send($v, "suspicious ips found: $text" . ($ban ? "\nbanned:$ban" : ''), button: $ips ?: [[
+                            foreach ($admins as $admin) {
+                                $this->send($admin, "suspicious ips found: $text" . ($ban ? "\nbanned:$ban" : ''), button: $ips ?: [[
                                     [
                                         'text'          => $this->i18n('analyze'),
                                         'callback_data' => '/analysisIp',
@@ -1639,8 +1639,7 @@ class Bot
                     $pac['last_reset_xray_time'] = $now;
                     $this->setPacConf($pac);
                     $this->resetXrStats(1);
-                    require __DIR__ . '/config.php';
-                    foreach ($c['admin'] as $admin) {
+                    foreach ($this->admins() as $admin) {
                         $this->send($admin, "vless: reset stats");
                     }
                 }
@@ -1690,17 +1689,21 @@ class Bot
 
     public function pinAdmin($pin, $unpin = false)
     {
-        require __DIR__ . '/config.php';
-        if ($unpin) {
-            return $this->unpin($c['admin'][0], $pin);
-        } else {
-            return $this->pin($c['admin'][0], $pin);
+        $admin = $this->admins()[0] ?? null;
+        if ($admin === null) {
+            return false;
         }
+
+        if ($unpin) {
+            return $this->unpin($admin, $pin);
+        }
+
+        return $this->pin($admin, $pin);
     }
 
     public function pinBackup($file = false)
     {
-        require __DIR__ . '/config.php';
+        $admin = $this->admins()[0] ?? null;
         $conf = $this->getPacConf();
         $bot  = preg_replace('~[\W]~iu', '_', $this->request('getMyName', [])['result']['name']);
         $json = $this->export();
@@ -1716,7 +1719,11 @@ class Bot
         if (!empty($conf['pinbackup'])) {
             $this->pinAdmin($conf['pinbackup'], 1);
         }
-        $conf['pinbackup'] = $this->upload($name, $json, $c['admin'][0])['result']['message_id'];
+        if ($admin === null) {
+            file_put_contents('/logs/php_error', "backup upload skipped: no admin configured\n", FILE_APPEND);
+            return;
+        }
+        $conf['pinbackup'] = $this->upload($name, $json, $admin)['result']['message_id'];
         $this->setPacConf($conf);
         $this->pinAdmin($conf['pinbackup']);
     }
@@ -1735,8 +1742,8 @@ class Bot
     public function checkVersion()
     {
         try {
-            require __DIR__ . '/config.php';
-            if (!empty($c['admin']) && (empty($this->time) || ((time() - $this->time) > 3600))) {
+            $admins = $this->admins();
+            if (!empty($admins) && (empty($this->time) || ((time() - $this->time) > 3600))) {
                 $this->time = time();
                 $current    = file_get_contents('/version');
                 $b          = exec('git -C / rev-parse --abbrev-ref HEAD');
@@ -1747,8 +1754,8 @@ class Bot
                     $diff       = array_slice($diff, 0, 10);
                     if (!empty($diff)) {
                         exec('git -C / fetch');
-                        foreach ($c['admin'] as $k => $v) {
-                            $this->send($v, implode("\n", $diff), 0, [
+                        foreach ($admins as $admin) {
+                            $this->send($admin, implode("\n", $diff), 0, [
                                 [
                                     [
                                         'text'    => 'changelog',
@@ -1762,7 +1769,7 @@ class Bot
                             ]);
                         }
                         if ($this->getPacConf()['autoupdate']) {
-                            $this->input['chat'] = $this->input['from'] = $c['admin'][0];
+                            $this->input['chat'] = $this->input['from'] = $admins[0];
                             $this->applyupdatebot();
                         }
                     }
@@ -1775,13 +1782,13 @@ class Bot
     public function checkCert()
     {
         try {
-            require __DIR__ . '/config.php';
-            if (!empty($c['admin']) && date('H') == 12 && (empty($this->time2) || ((time() - $this->time2) > 4600))) {
+            $admins = $this->admins();
+            if (!empty($admins) && date('H') == 12 && (empty($this->time2) || ((time() - $this->time2) > 4600))) {
                 $this->time2 = time();
                 $cert = $this->expireCert();
                 if (!empty($cert) && $cert - 60 * 60 * 24 * 14 < time()) {
-                    foreach ($c['admin'] as $k => $v) {
-                        $this->send($v, "certificate expire: " . date('Y-m-d H:i:s', $cert));
+                    foreach ($admins as $admin) {
+                        $this->send($admin, "certificate expire: " . date('Y-m-d H:i:s', $cert));
                     }
                 }
             }
@@ -2450,12 +2457,16 @@ class Bot
 
     public function sslip()
     {
-        require __DIR__ . '/config.php';
+        $admin = $this->admins()[0] ?? null;
+        if ($admin === null) {
+            return;
+        }
+
         $p  = $this->getPacConf();
         $ip = getenv('IP');
-        $r  = $this->send($c['admin'][0], "start $ip");
+        $r  = $this->send($admin, "start $ip");
 
-        $this->input['chat']        = $c['admin'][0];
+        $this->input['chat']        = $admin;
         $this->input['message_id']  = $r['result']['message_id'];
         $this->input['callback_id'] = false;
         if (empty($p)) {
@@ -7175,11 +7186,10 @@ DNS-over-HTTPS with IP:
                 $xr = $this->getXray();
                 foreach ($xr['inbounds'][0]['settings']['clients'] as $k => $v) {
                     if (empty($v['off']) && $v['email'] == $m['email']) {
-                        require __DIR__ . '/config.php';
-                        foreach ($c['admin'] as $admin) {
+                        foreach ($this->admins() as $admin) {
                             $this->send($admin, "vless: {$m['email']} limit ip " . count($this->pool[$m['email']]['ips']) . ' > ' . ($pac['ip_count'] ?: 1), button: [[
                                 [
-                                    'text'          => $this->i18n($c['off'] ? 'off' : 'on'),
+                                    'text'          => $this->i18n(empty($v['off']) ? 'off' : 'on'),
                                     'callback_data' => "/switchXr $k",
                                 ],
                             ]]);
