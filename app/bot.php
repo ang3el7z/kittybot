@@ -3,6 +3,7 @@
 require_once __DIR__ . '/src/Autoload.php';
 
 use KittyBot\Backups\BackupHistoryService;
+use KittyBot\Backups\BackupPayloadCodec;
 use KittyBot\Services\ComposeOverrideWriter;
 use KittyBot\Services\ContainerService;
 use KittyBot\Services\DockerClient;
@@ -32,6 +33,7 @@ class Bot
     public $reg;
     public $pool;
     public $hwid;
+    private ?BackupPayloadCodec $backupCodec = null;
     private ?BackupHistoryService $backupHistory = null;
     private ?ContainerService $containerService = null;
     private ?SettingsRepository $settingsRepository = null;
@@ -1812,7 +1814,19 @@ class Bot
             return $this->backupHistory;
         }
 
-        return $this->backupHistory = new BackupHistoryService(new BackupRepository($this->database()->pdo()));
+        return $this->backupHistory = new BackupHistoryService(
+            new BackupRepository($this->database()->pdo(), $this->backupCodec()),
+            $this->backupCodec(),
+        );
+    }
+
+    private function backupCodec(): BackupPayloadCodec
+    {
+        if ($this->backupCodec) {
+            return $this->backupCodec;
+        }
+
+        return $this->backupCodec = new BackupPayloadCodec();
     }
 
     public function checkVersion()
@@ -1989,7 +2003,6 @@ class Bot
             'clients' => $this->readClients(),
         ];
         $conf = [
-            'schema_version' => 2,
             'exported_at'    => gmdate('c'),
             'service_states' => $this->containers()->states(),
             'wg'  => $wg,
@@ -2015,7 +2028,7 @@ class Bot
             'sl'            => $this->getSSLocalConfig(),
             'xraystats'     => $this->getXrayStats(),
         ];
-        return json_encode($conf, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return $this->backupCodec()->encode($conf);
     }
 
     public function import()
@@ -2037,14 +2050,14 @@ class Bot
     public function importFile($file = false)
     {
         if (!empty($file)) {
-            $json = json_decode(file_get_contents($file), true);
+            $json = $this->backupCodec()->decode(file_get_contents($file));
         } else {
             $r    = $this->request('getFile', ['file_id' => $this->input['file_id']]);
-            $json = json_decode(file_get_contents($this->file . $r['result']['file_path']), true);
+            $json = $this->backupCodec()->decode(file_get_contents($this->file . $r['result']['file_path']));
         }
         if (empty($json) || !is_array($json)) {
             $this->answer($this->input['callback_id'], 'error', true);
-        } elseif (($json['schema_version'] ?? null) !== 2) {
+        } elseif (!$this->backupCodec()->supports($json)) {
             $this->answer($this->input['callback_id'], 'unsupported backup format', true);
         } else {
             // certs

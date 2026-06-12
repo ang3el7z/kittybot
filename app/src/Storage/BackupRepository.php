@@ -2,18 +2,22 @@
 
 namespace KittyBot\Storage;
 
+use KittyBot\Backups\BackupPayloadCodec;
 use PDO;
 
 final class BackupRepository
 {
-    public function __construct(private PDO $pdo)
+    public function __construct(
+        private PDO $pdo,
+        private ?BackupPayloadCodec $codec = null,
+    )
     {
     }
 
     public function add(string $name, string $payload): int
     {
-        $decoded = json_decode($payload, true);
-        if (!is_array($decoded) || ($decoded['schema_version'] ?? null) !== 2) {
+        $decoded = $this->codec()->decode($payload);
+        if ($decoded === null || !$this->codec()->supports($decoded)) {
             throw new \InvalidArgumentException('Unsupported backup payload');
         }
 
@@ -40,5 +44,10 @@ final class BackupRepository
         $payload = $stmt->fetchColumn();
 
         return $payload === false ? null : (string) $payload;
+    }
+
+    private function codec(): BackupPayloadCodec
+    {
+        return $this->codec ??= new BackupPayloadCodec();
     }
 }
