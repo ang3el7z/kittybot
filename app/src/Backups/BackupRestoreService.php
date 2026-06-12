@@ -98,6 +98,27 @@ final class BackupRestoreService
         $iptables();
     }
 
+    /** @param array<string,mixed> $xray
+     *  @param array<string,mixed> $pac
+     */
+    public function applyXray(array $xray, array $pac, callable $restart, callable $syncClients, callable $setUpstreamDomain): void
+    {
+        $restart($xray);
+        $syncClients();
+
+        $domain = $pac['transport'] != 'Reality'
+            ? 't'
+            : ($pac['reality']['domain'] ?? $xray['inbounds'][0]['streamSettings']['realitySettings']['serverNames'][0] ?? 't');
+
+        $setUpstreamDomain($domain);
+    }
+
+    /** @param array<string,mixed> $stats */
+    public function applyXrayStats(array $stats, callable $save): void
+    {
+        $save($stats);
+    }
+
     /** @return array<string,mixed> */
     public function normalizeHwid(mixed $hwid): array
     {

@@ -2183,15 +2183,22 @@ class Bot
             if (!empty($json['xray'])) {
                 $out[] = 'update xray';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->restartXray($json['xray']);
-                $this->adguardXrayClients();
-                $this->setUpstreamDomain($json['pac']['transport'] != 'Reality' ? 't' : ($json['pac']['reality']['domain'] ?: $json['xray']['inbounds'][0]['streamSettings']['realitySettings']['serverNames'][0]));
+                $this->backupRestore()->applyXray(
+                    $json['xray'],
+                    $json['pac'] ?? [],
+                    fn(array $xray) => $this->restartXray($xray),
+                    fn() => $this->adguardXrayClients(),
+                    fn(string $domain) => $this->setUpstreamDomain($domain),
+                );
             }
             // xraystats
             if (!empty($json['xraystats'])) {
                 $out[] = 'update xray stats';
                 $this->update($this->input['chat'], $this->input['message_id'], implode("\n", $out));
-                $this->setXrayStats($json['xraystats']);
+                $this->backupRestore()->applyXrayStats(
+                    $json['xraystats'],
+                    fn(array $stats) => $this->setXrayStats($stats),
+                );
             }
             // ocserv
             if (!empty($json['oc'])) {
