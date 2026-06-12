@@ -14,6 +14,7 @@ use KittyBot\Storage\HwidRepository;
 use KittyBot\Storage\MigrationRunner;
 use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
+use KittyBot\Storage\SqliteSessionHandler;
 
 class Bot
 {
@@ -141,8 +142,12 @@ class Bot
 
     public function session()
     {
-        session_id($this->input['from']);
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_set_save_handler(new SqliteSessionHandler($this->database()->pdo()), true);
+            session_id((string) $this->input['from']);
+            session_start();
+        }
+
         $replies = $this->sessionReplies();
         if (!empty($replies)) {
             if (empty($this->input['reply'])) {

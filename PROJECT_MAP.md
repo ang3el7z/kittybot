@@ -60,3 +60,4 @@ Optional:
 - `AdminRepository` owns Telegram admins and mirrors back to `app/config.php` during admin edits.
 - `BackupRepository` stores local bot exports for Telegram backup history.
 - `ServiceStateRepository` persists enabled/disabled optional container state.
+- `SqliteSessionHandler` stores PHP bot sessions in SQLite `bot_sessions`.
