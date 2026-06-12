@@ -8,6 +8,7 @@ use KittyBot\Services\DockerClient;
 use KittyBot\Services\ServiceCatalog;
 use KittyBot\Storage\Database;
 use KittyBot\Storage\MigrationRunner;
+use KittyBot\Storage\SettingsRepository;
 use KittyBot\Storage\ServiceStateRepository;
 
 class Bot
@@ -26,6 +27,8 @@ class Bot
     public $pool;
     public $hwid;
     private ?ContainerService $containerService = null;
+    private ?SettingsRepository $settingsRepository = null;
+    private ?array $pacConfCache = null;
 
     public function __construct($key, $i18n)
     {
@@ -2545,12 +2548,43 @@ class Bot
 
     public function getPacConf()
     {
-        return json_decode(file_get_contents($this->pac), true);
+        if ($this->pacConfCache !== null) {
+            return $this->pacConfCache;
+        }
+
+        $fallback = file_exists($this->pac) ? (json_decode(file_get_contents($this->pac), true) ?: []) : [];
+        try {
+            $settings = $this->settings();
+            $settings->seedJson('pac', $fallback);
+            return $this->pacConfCache = $settings->getJson('pac', $fallback);
+        } catch (Throwable) {
+            return $this->pacConfCache = $fallback;
+        }
     }
 
     public function setPacConf(array $conf)
     {
-        return file_put_contents($this->pac, json_encode($conf, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->pacConfCache = $conf;
+        $json = json_encode($conf, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        try {
+            $this->settings()->setJson('pac', $conf);
+        } catch (Throwable) {
+        }
+
+        return file_put_contents($this->pac, $json);
+    }
+
+    private function settings(): SettingsRepository
+    {
+        if ($this->settingsRepository) {
+            return $this->settingsRepository;
+        }
+
+        $db = new Database();
+        (new MigrationRunner($db->pdo()))->migrate();
+
+        return $this->settingsRepository = new SettingsRepository($db->pdo());
     }
 
     public function domain()
